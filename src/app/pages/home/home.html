@@ -1,0 +1,192 @@
+<header class="site-header">
+  <div class="container header-inner">
+    <a class="brand" href="#top">{{ 'hero.name' | translate }}</a>
+    <div class="header-actions">
+      <nav class="nav" [attr.aria-label]="'nav.primary' | translate">
+        <a href="#services">{{ 'nav.services' | translate }}</a>
+        <a href="#work">{{ 'nav.work' | translate }}</a>
+        <a href="#experience">{{ 'nav.experience' | translate }}</a>
+        <a href="#about">{{ 'nav.about' | translate }}</a>
+        <a href="#contact">{{ 'nav.contact' | translate }}</a>
+        <a class="nav-cta" [routerLink]="demoLink()">{{ 'nav.liveDemo' | translate }}</a>
+      </nav>
+      <app-language-switcher />
+    </div>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero">
+    <div class="container hero-grid">
+      <div class="hero-copy">
+        <div class="hero-identity">
+          <div class="portrait">
+            @if (!photoFailed()) {
+              <img
+                src="/images/profile.jpg"
+                [attr.alt]="'hero.name' | translate"
+                width="128"
+                height="128"
+                loading="eager"
+                decoding="async"
+                (error)="onPhotoError()"
+              />
+            } @else {
+              <span class="portrait-fallback">AS</span>
+            }
+          </div>
+          <div>
+            <p class="eyebrow">{{ 'hero.eyebrow' | translate }}</p>
+            <h1>{{ 'hero.name' | translate }}</h1>
+          </div>
+        </div>
+        <p class="lede">{{ 'hero.lede' | translate }}</p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="mailto:ahmadshoraka1@gmail.com">{{
+            'hero.hire' | translate
+          }}</a>
+          <a class="btn btn-ghost" [routerLink]="demoLink()">{{ 'hero.viewDemo' | translate }}</a>
+          <a class="btn btn-ghost" href="/cv/ahmad-shoraka-cv.pdf" target="_blank" rel="noopener">{{
+            'hero.downloadCv' | translate
+          }}</a>
+        </div>
+        <p class="availability">{{ 'hero.availability' | translate }}</p>
+      </div>
+      <div class="hero-panel" aria-hidden="true">
+        <div class="panel-card">
+          <span class="panel-label">{{ 'hero.focusLabel' | translate }}</span>
+          <strong>{{ 'hero.focusTitle' | translate }}</strong>
+          <span>{{ 'hero.focusText' | translate }}</span>
+        </div>
+        <div class="panel-card panel-card-delay">
+          <span class="panel-label">{{ 'hero.stackLabel' | translate }}</span>
+          <strong>{{ 'hero.stackTitle' | translate }}</strong>
+          <span>{{ 'hero.stackText' | translate }}</span>
+        </div>
+        <div class="panel-glow"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="services">
+    <div class="container">
+      <div class="section-head">
+        <h2>{{ 'services.title' | translate }}</h2>
+        <p>{{ 'services.subtitle' | translate }}</p>
+      </div>
+      <div class="service-grid">
+        @for (service of services; track service.titleKey) {
+          <article class="service-card">
+            <h3>{{ service.titleKey | translate }}</h3>
+            <p>{{ service.textKey | translate }}</p>
+          </article>
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-alt" id="work">
+    <div class="container">
+      <div class="section-head">
+        <h2>{{ 'work.title' | translate }}</h2>
+        <p>{{ 'work.subtitle' | translate }}</p>
+      </div>
+      <div class="project-grid project-grid-wide">
+        @for (project of projects; track project.titleKey) {
+          <article class="project-card">
+            <span class="tag">{{ project.tagKey | translate }}</span>
+            <h3>{{ project.titleKey | translate }}</h3>
+            <p>{{ project.textKey | translate }}</p>
+            @if (project.link) {
+              <a class="text-link" [routerLink]="demoLink()">{{ 'work.openDemo' | translate }}</a>
+            }
+          </article>
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="experience">
+    <div class="container">
+      <div class="section-head">
+        <h2>{{ 'experience.title' | translate }}</h2>
+        <p>{{ 'experience.subtitle' | translate }}</p>
+      </div>
+      <div class="timeline">
+        @for (job of experience; track job.roleKey) {
+          <article class="timeline-item">
+            <div class="timeline-meta">
+              <span class="timeline-period">{{ job.periodKey | translate }}</span>
+            </div>
+            <div class="timeline-body">
+              <h3>{{ job.roleKey | translate }}</h3>
+              <p class="timeline-company">{{ job.companyKey | translate }}</p>
+              <p>{{ job.textKey | translate }}</p>
+            </div>
+          </article>
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-alt" id="about">
+    <div class="container about-grid">
+      <div>
+        <div class="section-head">
+          <h2>{{ 'about.title' | translate }}</h2>
+          <p>{{ 'about.text' | translate }}</p>
+        </div>
+        <div class="education">
+          <h3>{{ 'education.title' | translate }}</h3>
+          <ul>
+            @for (item of education; track item.degreeKey) {
+              <li>
+                <strong>{{ item.degreeKey | translate }}</strong>
+                <span>{{ item.schoolKey | translate }}</span>
+                <span class="edu-period">{{ item.periodKey | translate }}</span>
+              </li>
+            }
+          </ul>
+        </div>
+      </div>
+      <div class="skills">
+        <h3>{{ 'about.technologies' | translate }}</h3>
+        <ul>
+          @for (skill of skills; track skill) {
+            <li>{{ skill }}</li>
+          }
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section contact" id="contact">
+    <div class="container contact-inner">
+      <h2>{{ 'contact.title' | translate }}</h2>
+      <p>{{ 'contact.text' | translate }}</p>
+      <div class="contact-actions">
+        <a class="btn btn-primary" href="mailto:ahmadshoraka1@gmail.com"
+          >ahmadshoraka1@gmail.com</a
+        >
+        <a
+          class="btn btn-ghost"
+          href="https://www.linkedin.com/in/ahmadshoraka"
+          target="_blank"
+          rel="noopener"
+        >
+          {{ 'contact.linkedin' | translate }}
+        </a>
+        <a class="btn btn-ghost" href="/cv/ahmad-shoraka-cv.pdf" target="_blank" rel="noopener">{{
+          'hero.downloadCv' | translate
+        }}</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="container footer-inner">
+    <span>{{ 'footer.rights' | translate: { year: currentYear } }}</span>
+    <a [routerLink]="demoLink()">{{ 'footer.demo' | translate }}</a>
+  </div>
+</footer>

@@ -1,0 +1,14 @@
+<div class="lang-switcher" role="navigation" [attr.aria-label]="'Language'">
+  @for (lang of langs; track lang) {
+    <a
+      class="lang-btn"
+      [class.active]="current() === lang"
+      [routerLink]="linkFor(lang)"
+      [attr.aria-current]="current() === lang ? 'true' : null"
+      [attr.lang]="lang"
+      [attr.title]="meta[lang].nativeName"
+    >
+      {{ meta[lang].label }}
+    </a>
+  }
+</div>

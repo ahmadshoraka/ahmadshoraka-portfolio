@@ -1,0 +1,305 @@
+{
+  "meta": {
+    "title": "Ahmad Shoraka | Senior Angular Developer",
+    "description": "Senior Frontend Developer specializing in Angular, admin panels, and business web apps. Available for freelance and contract work."
+  },
+  "nav": {
+    "primary": "Primary",
+    "services": "Services",
+    "work": "Work",
+    "experience": "Experience",
+    "about": "About",
+    "contact": "Contact",
+    "liveDemo": "Live demo"
+  },
+  "hero": {
+    "eyebrow": "Senior Frontend Developer",
+    "name": "Ahmad Shoraka",
+    "lede": "I build Angular admin panels and business web apps that teams can ship, scale, and maintain.",
+    "hire": "Hire me",
+    "viewDemo": "View admin demo",
+    "downloadCv": "Download CV",
+    "availability": "Available for freelance & contract · Tehran · Remote",
+    "focusLabel": "Focus",
+    "focusTitle": "Admin Panels",
+    "focusText": "Dashboards · Internal tools · SPAs",
+    "stackLabel": "Stack",
+    "stackTitle": "Angular + TypeScript",
+    "stackText": "Material · RxJS · Clean UI"
+  },
+  "services": {
+    "title": "What I help with",
+    "subtitle": "Clear frontend delivery for teams that need reliable Angular work.",
+    "items": {
+      "admin": {
+        "title": "Admin Panels & Dashboards",
+        "text": "Production-ready Angular panels with clean architecture, tables, filters, and scalable UI."
+      },
+      "apps": {
+        "title": "Business Web Apps",
+        "text": "Complex, form-heavy SPAs with strong validation, API integration, and maintainable code."
+      },
+      "aiBi": {
+        "title": "AI & BI Integration",
+        "text": "Embedded analytics and LLM chat experiences — Superset dashboards, secure token flows, and AI-assisted data exploration."
+      },
+      "lead": {
+        "title": "Frontend Leadership",
+        "text": "Feature delivery, refactoring, and coordination for teams that need reliable Angular execution."
+      }
+    }
+  },
+  "work": {
+    "title": "Selected work",
+    "subtitle": "Public demos and selected delivery from 6+ years building admin panels, business apps, and internal platforms.",
+    "openDemo": "Open live demo →",
+    "items": {
+      "ops": {
+        "title": "Operations Admin Dashboard",
+        "tag": "Live demo",
+        "text": "A responsive Angular Material dashboard with KPI cards, filters, and a data table — built as a public sample."
+      },
+      "aiAssistant": {
+        "title": "Enterprise AI Assistant",
+        "tag": "AI + BI platform",
+        "text": "Customized a self-hosted Open WebUI platform (SvelteKit + FastAPI): embedded Apache Superset dashboards via secure guest tokens, AI-assisted chart analysis, a schema-driven form engine with Jalali dates, and full Persian/RTL branding."
+      },
+      "easypay": {
+        "title": "EasyPay Admin Monorepo",
+        "tag": "Team lead",
+        "text": "Led admin panel development across a multi-app Angular monorepo covering payments, credit, investment, and app management."
+      },
+      "hr": {
+        "title": "HR Management Panel",
+        "tag": "Team lead",
+        "text": "Frontend team lead on an HR management panel for South Pars Gas Complex at Maherafzar Noandish."
+      },
+      "easycard": {
+        "title": "EasyCard Admin Panel",
+        "tag": "Lead developer",
+        "text": "Led the Angular Material admin panel for EasyCard as part of Tosan Soha’s product suite."
+      },
+      "mobile": {
+        "title": "Ionic Mobile Apps",
+        "tag": "Angular + Ionic",
+        "text": "Contributed to mobile applications such as iFilm and Young Journalists Club using Angular, Ionic, and Bootstrap."
+      },
+      "react": {
+        "title": "React Product Frontends",
+        "tag": "React",
+        "text": "Joined merged frontend teams to contribute to React projects including ezPay and Zilink / Grand Bazaar surfaces."
+      }
+    }
+  },
+  "experience": {
+    "title": "Experience",
+    "subtitle": "A compact view of roles that shaped how I deliver Angular products.",
+    "items": {
+      "maher": {
+        "role": "Team Coordinator & Senior Frontend Developer",
+        "company": "Maherafzar Noandish",
+        "period": "Jan 2025 — Present",
+        "text": "Frontend team lead for the HR management panel of South Pars Gas Complex, and developer on an enterprise AI assistant platform integrating LLM chat, document RAG, and Apache Superset dashboards."
+      },
+      "tosan": {
+        "role": "Lead Admin Panel / Senior Frontend Developer",
+        "company": "Tosan Soha",
+        "period": "May 2020 — Apr 2025",
+        "text": "Grew from rewrite-team member to admin-panel lead across EasyPay, Credit, Investment, and EasyCard — including monorepo Angular work."
+      },
+      "adtn": {
+        "role": "Senior Frontend Developer",
+        "company": "Amayesh Dadeh Tejarat Novin (ADTN)",
+        "period": "Jul 2019 — Apr 2020",
+        "text": "Built Angular admin experiences for Agricultural Bank Leasing and PetroSadaf / PetroNovin panels."
+      },
+      "dar": {
+        "role": "Junior Frontend Developer",
+        "company": "Dadeh Amayan Ramzineh",
+        "period": "Apr 2018 — Mar 2019",
+        "text": "Developed Angular/TypeScript mobile apps and admin panels, with exposure to ASP.NET on the backend side."
+      }
+    }
+  },
+  "education": {
+    "title": "Education",
+    "items": {
+      "master": {
+        "degree": "Master’s in Computer Architecture",
+        "school": "Shahid Beheshti University",
+        "period": "Oct 2019 — Feb 2020"
+      },
+      "bachelor": {
+        "degree": "Bachelor’s in Software Engineering",
+        "school": "Elm o Farhang University",
+        "period": "Sep 2013 — May 2018"
+      }
+    }
+  },
+  "about": {
+    "title": "About",
+    "text": "Frontend developer with 6+ years of experience building web applications and admin panels for enterprise and business products. Skilled in agile teams, recently leading development teams to deliver software products, with a focus on clean, scalable Angular code.",
+    "technologies": "Technologies"
+  },
+  "contact": {
+    "title": "Let’s build something solid",
+    "text": "Looking for an Angular developer for an admin panel, dashboard, or business app? Send a short brief and I’ll reply with next steps.",
+    "linkedin": "LinkedIn"
+  },
+  "footer": {
+    "rights": "© {{year}} Ahmad Shoraka",
+    "demo": "Admin dashboard demo"
+  },
+  "demo": {
+    "brand": "Nova Ops",
+    "brandSub": "Admin demo",
+    "back": "Back to portfolio",
+    "toggleMenu": "Toggle menu",
+    "export": "Export",
+    "newOrder": "New order",
+    "newOrderDialog": {
+      "title": "Create new order",
+      "subtitle": "Add an order to the sample dashboard",
+      "customer": "Customer",
+      "product": "Product",
+      "amount": "Amount",
+      "status": "Status",
+      "date": "Date",
+      "required": "This field is required",
+      "validAmount": "Enter an amount greater than zero",
+      "close": "Close dialog",
+      "cancel": "Cancel",
+      "create": "Create order"
+    },
+    "data": {
+      "customers": {
+        "nora": "Nora Ellis",
+        "james": "James Park",
+        "lina": "Lina Ortiz",
+        "omar": "Omar Haddad",
+        "mia": "Mia Chen",
+        "ethan": "Ethan Brooks",
+        "sara": "Sara Novak",
+        "daniel": "Daniel Ruiz"
+      },
+      "products": {
+        "pro": "Pro Plan",
+        "team": "Team Seat",
+        "analytics": "Analytics Pack",
+        "starter": "Starter"
+      }
+    },
+    "nav": {
+      "label": "Dashboard navigation",
+      "overview": "Overview",
+      "orders": "Orders",
+      "customers": "Customers",
+      "analytics": "Analytics",
+      "settings": "Settings"
+    },
+    "pages": {
+      "overview": {
+        "title": "Overview",
+        "subtitle": "Key metrics and recent activity at a glance"
+      },
+      "orders": {
+        "title": "Orders",
+        "subtitle": "Search, filter, and review the full order list"
+      },
+      "customers": {
+        "title": "Customers",
+        "subtitle": "Customer accounts, plans, and lifetime value"
+      },
+      "analytics": {
+        "title": "Analytics",
+        "subtitle": "Traffic trends and channel performance"
+      },
+      "settings": {
+        "title": "Settings",
+        "subtitle": "Workspace preferences and notification controls"
+      }
+    },
+    "overview": {
+      "insightsTitle": "Operational insights",
+      "insightsSub": "Highlights from the last 7 days",
+      "insight1": "Paid orders increased 12% week over week.",
+      "insight2": "Average fulfillment time dropped to 14 minutes.",
+      "insight3": "Refund rate remains below the 2% target.",
+      "recentSub": "Latest transactions from your store",
+      "viewAll": "View all orders"
+    },
+    "kpi": {
+      "revenue": "Revenue",
+      "orders": "Orders",
+      "activeUsers": "Active users",
+      "refundRate": "Refund rate"
+    },
+    "chart": {
+      "title": "Weekly activity",
+      "subtitle": "Mock traffic for demo purposes",
+      "aria": "Weekly activity bar chart",
+      "mon": "Mon",
+      "tue": "Tue",
+      "wed": "Wed",
+      "thu": "Thu",
+      "fri": "Fri",
+      "sat": "Sat",
+      "sun": "Sun"
+    },
+    "orders": {
+      "title": "Recent orders",
+      "subtitle": "Filterable sample dataset",
+      "search": "Search",
+      "searchPlaceholder": "Order, customer, product",
+      "status": "Status",
+      "all": "All",
+      "paid": "Paid",
+      "pending": "Pending",
+      "refunded": "Refunded",
+      "colOrder": "Order",
+      "colCustomer": "Customer",
+      "colProduct": "Product",
+      "colAmount": "Amount",
+      "colStatus": "Status",
+      "colDate": "Date",
+      "empty": "No orders match your filters."
+    },
+    "customers": {
+      "search": "Search customers",
+      "searchPlaceholder": "Name, email, or plan",
+      "colName": "Customer",
+      "colEmail": "Email",
+      "colPlan": "Plan",
+      "colOrders": "Orders",
+      "colSpent": "Spent",
+      "colStatus": "Status",
+      "active": "Active",
+      "trial": "Trial",
+      "churned": "Churned"
+    },
+    "analytics": {
+      "conversion": "Conversion rate",
+      "avgOrder": "Avg. order value",
+      "churn": "Monthly churn",
+      "support": "Avg. response",
+      "trafficTitle": "Traffic overview",
+      "trafficSub": "Sessions by day of week",
+      "channelsTitle": "Acquisition channels",
+      "channelsSub": "Share of new sessions"
+    },
+    "settings": {
+      "profileTitle": "Workspace profile",
+      "profileSub": "Basic workspace information",
+      "workspace": "Workspace name",
+      "email": "Admin email",
+      "notificationsTitle": "Notifications",
+      "notificationsSub": "Choose what you want to receive",
+      "emailAlerts": "Email alerts",
+      "emailAlertsSub": "New orders and failed payments",
+      "weeklyDigest": "Weekly digest",
+      "weeklyDigestSub": "Summary of KPIs every Monday",
+      "darkSidebar": "Dark sidebar",
+      "darkSidebarSub": "Switch sidebar to light or dark theme"
+    }
+  }
+}

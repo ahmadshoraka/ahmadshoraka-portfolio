@@ -1,0 +1,537 @@
+<div class="demo-shell">
+  <mat-sidenav-container class="layout" autosize>
+    <mat-sidenav
+      class="sidenav"
+      [mode]="'side'"
+      [opened]="sidenavOpen()"
+      [class.sidenav-light]="!darkSidebar()"
+    >
+      <div class="brand-block">
+        <span class="brand-mark">
+          <mat-icon>hub</mat-icon>
+        </span>
+        <div>
+          <strong>{{ 'demo.brand' | translate }}</strong>
+          <small>{{ 'demo.brandSub' | translate }}</small>
+        </div>
+      </div>
+
+      <nav class="side-nav" [attr.aria-label]="'demo.nav.label' | translate">
+        @for (item of navItems; track item.id) {
+          <button
+            type="button"
+            class="side-nav-item"
+            [class.active]="activeView() === item.id"
+            (click)="setView(item.id)"
+          >
+            <mat-icon>{{ item.icon }}</mat-icon>
+            <span>{{ item.labelKey | translate }}</span>
+          </button>
+        }
+      </nav>
+
+      <div class="sidenav-footer">
+        <a class="back-link" [routerLink]="homeLink()">
+          <mat-icon>arrow_back</mat-icon>
+          {{ 'demo.back' | translate }}
+        </a>
+      </div>
+    </mat-sidenav>
+
+    <mat-sidenav-content class="main-panel">
+      <header class="topbar">
+        <button
+          mat-icon-button
+          type="button"
+          class="menu-btn"
+          (click)="toggleSidenav()"
+          [attr.aria-label]="'demo.toggleMenu' | translate"
+        >
+          <mat-icon>menu</mat-icon>
+        </button>
+
+        <div class="topbar-title">
+          <h1>{{ pageTitleKey() | translate }}</h1>
+          <p>{{ pageSubtitleKey() | translate }}</p>
+        </div>
+
+        <app-language-switcher />
+
+        <span class="spacer"></span>
+
+        @if (activeView() === 'orders' || activeView() === 'overview') {
+          <button mat-stroked-button type="button" class="toolbar-btn" (click)="exportOrders()">
+            <mat-icon>download</mat-icon>
+            {{ 'demo.export' | translate }}
+          </button>
+          <button
+            mat-flat-button
+            color="primary"
+            type="button"
+            class="toolbar-btn"
+            (click)="openNewOrder()"
+          >
+            <mat-icon>add</mat-icon>
+            {{ 'demo.newOrder' | translate }}
+          </button>
+        }
+      </header>
+
+      <div class="content">
+        @switch (activeView()) {
+          @case ('overview') {
+            <section class="kpi-grid">
+              @for (kpi of kpis; track kpi.labelKey) {
+                <article class="kpi-card">
+                  <div class="kpi-icon">
+                    <mat-icon>{{ kpi.icon }}</mat-icon>
+                  </div>
+                  <div>
+                    <span class="kpi-label">{{ kpi.labelKey | translate }}</span>
+                    <strong class="kpi-value">{{ kpi.value }}</strong>
+                    <span class="kpi-delta" [ngClass]="kpi.up ? 'up' : 'down'">{{ kpi.delta }}</span>
+                  </div>
+                </article>
+              }
+            </section>
+
+            <section class="panels">
+              <mat-card class="panel-card chart-card">
+                <mat-card-header>
+                  <mat-card-title>{{ 'demo.chart.title' | translate }}</mat-card-title>
+                  <mat-card-subtitle>{{ 'demo.chart.subtitle' | translate }}</mat-card-subtitle>
+                </mat-card-header>
+                <mat-card-content>
+                  <div class="chart" role="img" [attr.aria-label]="'demo.chart.aria' | translate">
+                    @for (bar of chartBars; track bar.labelKey) {
+                      <div class="bar-col">
+                        <div class="bar-track">
+                          <div class="bar" [style.height.%]="bar.value"></div>
+                        </div>
+                        <span>{{ bar.labelKey | translate }}</span>
+                      </div>
+                    }
+                  </div>
+                </mat-card-content>
+              </mat-card>
+
+              <mat-card class="panel-card insight-card">
+                <mat-card-header>
+                  <mat-card-title>{{ 'demo.overview.insightsTitle' | translate }}</mat-card-title>
+                  <mat-card-subtitle>{{ 'demo.overview.insightsSub' | translate }}</mat-card-subtitle>
+                </mat-card-header>
+                <mat-card-content>
+                  <ul class="insight-list">
+                    <li>
+                      <mat-icon>trending_up</mat-icon>
+                      <span>{{ 'demo.overview.insight1' | translate }}</span>
+                    </li>
+                    <li>
+                      <mat-icon>schedule</mat-icon>
+                      <span>{{ 'demo.overview.insight2' | translate }}</span>
+                    </li>
+                    <li>
+                      <mat-icon>verified</mat-icon>
+                      <span>{{ 'demo.overview.insight3' | translate }}</span>
+                    </li>
+                  </ul>
+                </mat-card-content>
+              </mat-card>
+            </section>
+
+            <mat-card class="panel-card table-card">
+              <mat-card-header>
+                <mat-card-title>{{ 'demo.orders.title' | translate }}</mat-card-title>
+                <mat-card-subtitle>{{ 'demo.overview.recentSub' | translate }}</mat-card-subtitle>
+                <button mat-button type="button" class="card-action" (click)="setView('orders')">
+                  {{ 'demo.overview.viewAll' | translate }}
+                  <mat-icon>arrow_forward</mat-icon>
+                </button>
+              </mat-card-header>
+              <mat-card-content>
+                <ng-container *ngTemplateOutlet="ordersTable; context: { rows: recentOrders() }" />
+              </mat-card-content>
+            </mat-card>
+          }
+
+          @case ('orders') {
+            <mat-card class="panel-card table-card full-table">
+              <mat-card-header>
+                <mat-card-title>{{ 'demo.pages.orders.title' | translate }}</mat-card-title>
+                <mat-card-subtitle>{{ 'demo.orders.subtitle' | translate }}</mat-card-subtitle>
+              </mat-card-header>
+              <mat-card-content>
+                <ng-container *ngTemplateOutlet="orderFilters" />
+                <ng-container *ngTemplateOutlet="ordersTable; context: { rows: filteredOrders() }" />
+              </mat-card-content>
+            </mat-card>
+          }
+
+          @case ('customers') {
+            <mat-card class="panel-card table-card">
+              <mat-card-header>
+                <mat-card-title>{{ 'demo.pages.customers.title' | translate }}</mat-card-title>
+                <mat-card-subtitle>{{ 'demo.pages.customers.subtitle' | translate }}</mat-card-subtitle>
+              </mat-card-header>
+              <mat-card-content>
+                <div class="filters filters-single">
+                  <mat-form-field appearance="outline" class="search-field">
+                    <mat-label>{{ 'demo.customers.search' | translate }}</mat-label>
+                    <input
+                      matInput
+                      [ngModel]="customerSearch()"
+                      (ngModelChange)="onCustomerSearch($event)"
+                      [placeholder]="'demo.customers.searchPlaceholder' | translate"
+                    />
+                    <mat-icon matSuffix>search</mat-icon>
+                  </mat-form-field>
+                </div>
+
+                <div class="table-wrap">
+                  <table mat-table [dataSource]="filteredCustomers()" class="data-table">
+                    <ng-container matColumnDef="name">
+                      <th mat-header-cell *matHeaderCellDef>{{ 'demo.customers.colName' | translate }}</th>
+                      <td mat-cell *matCellDef="let row">
+                        <div class="user-cell">
+                          <span class="avatar">{{ initials(row.name) }}</span>
+                          <span>{{ row.name }}</span>
+                        </div>
+                      </td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="email">
+                      <th mat-header-cell *matHeaderCellDef>{{ 'demo.customers.colEmail' | translate }}</th>
+                      <td mat-cell *matCellDef="let row">{{ row.email }}</td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="plan">
+                      <th mat-header-cell *matHeaderCellDef>{{ 'demo.customers.colPlan' | translate }}</th>
+                      <td mat-cell *matCellDef="let row">{{ row.plan }}</td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="orders">
+                      <th mat-header-cell *matHeaderCellDef>{{ 'demo.customers.colOrders' | translate }}</th>
+                      <td mat-cell *matCellDef="let row">{{ row.orders }}</td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="spent">
+                      <th mat-header-cell *matHeaderCellDef>{{ 'demo.customers.colSpent' | translate }}</th>
+                      <td mat-cell *matCellDef="let row">{{ row.spent | groupedNumber }}</td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="status">
+                      <th mat-header-cell *matHeaderCellDef>{{ 'demo.customers.colStatus' | translate }}</th>
+                      <td mat-cell *matCellDef="let row">
+                        <span class="status" [attr.data-status]="row.status">{{
+                          customerStatusKey(row.status) | translate
+                        }}</span>
+                      </td>
+                    </ng-container>
+
+                    <tr mat-header-row *matHeaderRowDef="customerColumns"></tr>
+                    <tr mat-row *matRowDef="let row; columns: customerColumns"></tr>
+                  </table>
+                </div>
+              </mat-card-content>
+            </mat-card>
+          }
+
+          @case ('analytics') {
+            <section class="analytics-metrics">
+              @for (metric of analyticsMetrics; track metric.labelKey) {
+                <article class="metric-card">
+                  <span class="metric-label">{{ metric.labelKey | translate }}</span>
+                  <strong>{{ metric.value }}</strong>
+                  <span class="metric-trend" [ngClass]="metric.up ? 'up' : 'down'">{{ metric.trend }}</span>
+                </article>
+              }
+            </section>
+
+            <section class="panels panels-analytics">
+              <mat-card class="panel-card chart-card chart-card-large">
+                <mat-card-header>
+                  <mat-card-title>{{ 'demo.analytics.trafficTitle' | translate }}</mat-card-title>
+                  <mat-card-subtitle>{{ 'demo.analytics.trafficSub' | translate }}</mat-card-subtitle>
+                </mat-card-header>
+                <mat-card-content>
+                  <div class="chart chart-tall" role="img" [attr.aria-label]="'demo.chart.aria' | translate">
+                    @for (bar of chartBars; track bar.labelKey) {
+                      <div class="bar-col">
+                        <div class="bar-track">
+                          <div class="bar" [style.height.%]="bar.value"></div>
+                        </div>
+                        <span>{{ bar.labelKey | translate }}</span>
+                      </div>
+                    }
+                  </div>
+                </mat-card-content>
+              </mat-card>
+
+              <mat-card class="panel-card">
+                <mat-card-header>
+                  <mat-card-title>{{ 'demo.analytics.channelsTitle' | translate }}</mat-card-title>
+                  <mat-card-subtitle>{{ 'demo.analytics.channelsSub' | translate }}</mat-card-subtitle>
+                </mat-card-header>
+                <mat-card-content>
+                  <div class="channel-list">
+                    <div class="channel-row">
+                      <span>Direct</span>
+                      <div class="channel-bar"><i style="width: 62%"></i></div>
+                      <strong>62%</strong>
+                    </div>
+                    <div class="channel-row">
+                      <span>Organic</span>
+                      <div class="channel-bar"><i style="width: 24%"></i></div>
+                      <strong>24%</strong>
+                    </div>
+                    <div class="channel-row">
+                      <span>Referral</span>
+                      <div class="channel-bar"><i style="width: 14%"></i></div>
+                      <strong>14%</strong>
+                    </div>
+                  </div>
+                </mat-card-content>
+              </mat-card>
+            </section>
+          }
+
+          @case ('settings') {
+            <div class="settings-grid">
+              <mat-card class="panel-card">
+                <mat-card-header>
+                  <mat-card-title>{{ 'demo.settings.profileTitle' | translate }}</mat-card-title>
+                  <mat-card-subtitle>{{ 'demo.settings.profileSub' | translate }}</mat-card-subtitle>
+                </mat-card-header>
+                <mat-card-content class="settings-form">
+                  <mat-form-field appearance="outline">
+                    <mat-label>{{ 'demo.settings.workspace' | translate }}</mat-label>
+                    <input matInput value="Nova Ops" />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>{{ 'demo.settings.email' | translate }}</mat-label>
+                    <input matInput value="admin@novaops.io" />
+                  </mat-form-field>
+                </mat-card-content>
+              </mat-card>
+
+              <mat-card class="panel-card">
+                <mat-card-header>
+                  <mat-card-title>{{ 'demo.settings.notificationsTitle' | translate }}</mat-card-title>
+                  <mat-card-subtitle>{{ 'demo.settings.notificationsSub' | translate }}</mat-card-subtitle>
+                </mat-card-header>
+                <mat-card-content class="toggle-list">
+                  <div class="toggle-row">
+                    <div>
+                      <strong>{{ 'demo.settings.emailAlerts' | translate }}</strong>
+                      <p>{{ 'demo.settings.emailAlertsSub' | translate }}</p>
+                    </div>
+                    <mat-slide-toggle [ngModel]="emailAlerts()" (ngModelChange)="emailAlerts.set($event)" />
+                  </div>
+                  <div class="toggle-row">
+                    <div>
+                      <strong>{{ 'demo.settings.weeklyDigest' | translate }}</strong>
+                      <p>{{ 'demo.settings.weeklyDigestSub' | translate }}</p>
+                    </div>
+                    <mat-slide-toggle [ngModel]="weeklyDigest()" (ngModelChange)="weeklyDigest.set($event)" />
+                  </div>
+                  <div class="toggle-row">
+                    <div>
+                      <strong>{{ 'demo.settings.darkSidebar' | translate }}</strong>
+                      <p>{{ 'demo.settings.darkSidebarSub' | translate }}</p>
+                    </div>
+                    <mat-slide-toggle [ngModel]="darkSidebar()" (ngModelChange)="darkSidebar.set($event)" />
+                  </div>
+                </mat-card-content>
+              </mat-card>
+            </div>
+          }
+        }
+      </div>
+    </mat-sidenav-content>
+  </mat-sidenav-container>
+</div>
+
+@if (newOrderOpen()) {
+  <div class="dialog-backdrop" (click)="closeNewOrder()">
+    <section
+      class="order-dialog"
+      role="dialog"
+      aria-modal="true"
+      [attr.aria-labelledby]="'new-order-title'"
+      (click)="$event.stopPropagation()"
+    >
+      <header class="dialog-header">
+        <div>
+          <h2 id="new-order-title">{{ 'demo.newOrderDialog.title' | translate }}</h2>
+          <p>{{ 'demo.newOrderDialog.subtitle' | translate }}</p>
+        </div>
+        <button
+          mat-icon-button
+          type="button"
+          (click)="closeNewOrder()"
+          [attr.aria-label]="'demo.newOrderDialog.close' | translate"
+        >
+          <mat-icon>close</mat-icon>
+        </button>
+      </header>
+
+      <form class="order-form" (ngSubmit)="saveNewOrder()" novalidate>
+        <mat-form-field appearance="outline">
+          <mat-label>{{ 'demo.newOrderDialog.customer' | translate }}</mat-label>
+          <input
+            matInput
+            name="customer"
+            required
+            [ngModel]="newOrder().customer"
+            (ngModelChange)="updateNewOrder('customer', $event)"
+          />
+          @if (newOrderSubmitted() && !newOrder().customer.trim()) {
+            <mat-error>{{ 'demo.newOrderDialog.required' | translate }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>{{ 'demo.newOrderDialog.product' | translate }}</mat-label>
+          <input
+            matInput
+            name="product"
+            required
+            [ngModel]="newOrder().product"
+            (ngModelChange)="updateNewOrder('product', $event)"
+          />
+          @if (newOrderSubmitted() && !newOrder().product.trim()) {
+            <mat-error>{{ 'demo.newOrderDialog.required' | translate }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>{{ 'demo.newOrderDialog.amount' | translate }}</mat-label>
+          <input
+            matInput
+            name="amount"
+            type="number"
+            min="0.01"
+            step="0.01"
+            required
+            [ngModel]="newOrder().amount"
+            (ngModelChange)="updateNewOrder('amount', $event)"
+          />
+          @if (newOrderSubmitted() && (newOrder().amount ?? 0) <= 0) {
+            <mat-error>{{ 'demo.newOrderDialog.validAmount' | translate }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>{{ 'demo.newOrderDialog.status' | translate }}</mat-label>
+          <mat-select
+            name="status"
+            [ngModel]="newOrder().status"
+            (ngModelChange)="updateNewOrder('status', $event)"
+          >
+            <mat-option value="Paid">{{ 'demo.orders.paid' | translate }}</mat-option>
+            <mat-option value="Pending">{{ 'demo.orders.pending' | translate }}</mat-option>
+            <mat-option value="Refunded">{{ 'demo.orders.refunded' | translate }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>{{ 'demo.newOrderDialog.date' | translate }}</mat-label>
+          <input
+            matInput
+            name="date"
+            required
+            [matDatepicker]="orderDatepicker"
+            [ngModel]="newOrder().date"
+            (ngModelChange)="updateNewOrder('date', $event)"
+          />
+          <mat-datepicker-toggle matIconSuffix [for]="orderDatepicker" />
+          <mat-datepicker #orderDatepicker />
+          @if (newOrderSubmitted() && !newOrder().date) {
+            <mat-error>{{ 'demo.newOrderDialog.required' | translate }}</mat-error>
+          }
+        </mat-form-field>
+
+        <footer class="dialog-actions">
+          <button mat-button type="button" (click)="closeNewOrder()">
+            {{ 'demo.newOrderDialog.cancel' | translate }}
+          </button>
+          <button mat-flat-button color="primary" type="submit">
+            {{ 'demo.newOrderDialog.create' | translate }}
+          </button>
+        </footer>
+      </form>
+    </section>
+  </div>
+}
+
+<ng-template #orderFilters>
+  <div class="filters">
+    <mat-form-field appearance="outline" class="search-field">
+      <mat-label>{{ 'demo.orders.search' | translate }}</mat-label>
+      <input
+        matInput
+        [ngModel]="search()"
+        (ngModelChange)="onSearch($event)"
+        [placeholder]="'demo.orders.searchPlaceholder' | translate"
+      />
+      <mat-icon matSuffix>search</mat-icon>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="status-field">
+      <mat-label>{{ 'demo.orders.status' | translate }}</mat-label>
+      <mat-select [ngModel]="statusFilter()" (ngModelChange)="onStatusChange($event)">
+        <mat-option value="All">{{ 'demo.orders.all' | translate }}</mat-option>
+        <mat-option value="Paid">{{ 'demo.orders.paid' | translate }}</mat-option>
+        <mat-option value="Pending">{{ 'demo.orders.pending' | translate }}</mat-option>
+        <mat-option value="Refunded">{{ 'demo.orders.refunded' | translate }}</mat-option>
+      </mat-select>
+    </mat-form-field>
+  </div>
+</ng-template>
+
+<ng-template #ordersTable let-rows="rows">
+  <div class="table-wrap">
+    <table mat-table [dataSource]="rows" class="data-table">
+      <ng-container matColumnDef="id">
+        <th mat-header-cell *matHeaderCellDef>{{ 'demo.orders.colOrder' | translate }}</th>
+        <td mat-cell *matCellDef="let row">{{ row.id }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="customer">
+        <th mat-header-cell *matHeaderCellDef>{{ 'demo.orders.colCustomer' | translate }}</th>
+        <td mat-cell *matCellDef="let row">{{ row.customer }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="product">
+        <th mat-header-cell *matHeaderCellDef>{{ 'demo.orders.colProduct' | translate }}</th>
+        <td mat-cell *matCellDef="let row">{{ row.product }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="amount">
+        <th mat-header-cell *matHeaderCellDef>{{ 'demo.orders.colAmount' | translate }}</th>
+        <td mat-cell *matCellDef="let row">{{ row.amount | groupedNumber }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="status">
+        <th mat-header-cell *matHeaderCellDef>{{ 'demo.orders.colStatus' | translate }}</th>
+        <td mat-cell *matCellDef="let row">
+          <span class="status" [attr.data-status]="row.status">{{
+            statusKey(row.status) | translate
+          }}</span>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="date">
+        <th mat-header-cell *matHeaderCellDef>{{ 'demo.orders.colDate' | translate }}</th>
+        <td mat-cell *matCellDef="let row">{{ row.date | localizedDate: lang() }}</td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+    </table>
+
+    @if (rows.length === 0) {
+      <p class="empty">{{ 'demo.orders.empty' | translate }}</p>
+    }
+  </div>
+</ng-template>
