@@ -1081,7 +1081,7 @@ void InvalidateSetup()
 {
    Print("MicroMAP setup invalidated after ", g_attempt, " stop(s)");
    g_state = ST_COOLDOWN;
-   g_cooldownUntil = TimeCurrent() + PeriodSeconds(SignalTF) * 3;
+   g_cooldownUntil = TimeCurrent() + TfToSeconds(SignalTF) * 3;
    g_dir = 0;
    g_attempt = 0;
    g_pendingTicket = -1;
@@ -1094,7 +1094,7 @@ void ResetSetup(bool afterWin)
 {
    g_state = afterWin ? ST_COOLDOWN : ST_IDLE;
    if(afterWin)
-      g_cooldownUntil = TimeCurrent() + PeriodSeconds(SignalTF);
+      g_cooldownUntil = TimeCurrent() + TfToSeconds(SignalTF);
    else
       g_cooldownUntil = 0;
    g_dir = 0;
@@ -1107,7 +1107,7 @@ void ResetSetup(bool afterWin)
 }
 
 //+------------------------------------------------------------------+
-int PeriodSeconds(ENUM_TIMEFRAMES tf)
+int TfToSeconds(ENUM_TIMEFRAMES tf)
 {
    switch(tf)
    {
