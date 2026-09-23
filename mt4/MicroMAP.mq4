@@ -4,18 +4,18 @@
 //| Rules from poursamadi.com/micromap and the public training video.|
 //|                                                                  |
 //| One market/pending position at a time. Fixed percent risk.       |
-//| Stops new trades when gross closed profit or gross closed loss   |
-//| reaches its own daily cap. Invalidates a setup after 3 stops.    |
+//| Max 3 opens per day. After the first winning close, no more      |
+//| new trades that day. Invalidates a setup after 3 stops.          |
 //|                                                                  |
 //| This encodes the structural rules. It does not guarantee profit. |
 //| Validate Expected payoff and Profit factor in Strategy Tester.   |
 //+------------------------------------------------------------------+
 #property copyright "MicroMAP EA"
 #property link      "https://poursamadi.com/micromap/"
-#property version   "1.01"
+#property version   "1.02"
 #property strict
 #property description "Spike + micro-channel entries with up to 3 attempts."
-#property description "One position. Daily gross profit/loss caps."
+#property description "One position. Max 3 opens/day. Stop after first daily win."
 
 enum ENUM_MM_ENTRY_MODE
 {
@@ -27,8 +27,8 @@ enum ENUM_MM_ENTRY_MODE
 
 input int                MagicNumber           = 260923;
 input double             RiskPercent           = 0.5;   // risk per trade, % of day-start balance
-input double             DailyProfitCapPercent = 2.0;   // stop new trades after this gross profit
-input double             DailyLossCapPercent   = 1.5;   // stop new trades after this gross loss
+input int                MaxTradesPerDay       = 3;     // max market positions opened per day
+input bool               StopAfterFirstWin     = true;  // no more entries after first winning close today
 input double             RewardRisk            = 2.0;   // TP distance / SL distance (page: min ~2)
 input ENUM_MM_ENTRY_MODE EntryMode             = MM_CLASSIC_CHAIN;
 input int                MaxAttempts           = 3;     // invalidate setup after this many stops
@@ -82,6 +82,7 @@ int      g_statsHistory   = -1;
 double   g_statsGrossProfit = 0.0;
 double   g_statsGrossLoss   = 0.0;
 int      g_statsTrades      = 0;
+bool     g_statsHadWin      = false;
 ENUM_TIMEFRAMES g_tf        = PERIOD_M5;
 string   g_lastSkip         = "";
 int      g_scanBars         = 0;
@@ -103,7 +104,7 @@ void RefreshTF()
 //+------------------------------------------------------------------+
 int OnInit()
 {
-   if(RiskPercent <= 0.0 || DailyProfitCapPercent <= 0.0 || DailyLossCapPercent <= 0.0)
+   if(RiskPercent <= 0.0 || MaxTradesPerDay < 1)
       return INIT_PARAMETERS_INCORRECT;
    if(RewardRisk <= 0.0 || MaxAttempts < 1 || MaxAttempts > 3)
       return INIT_PARAMETERS_INCORRECT;
@@ -129,12 +130,6 @@ int OnInit()
 
    LoadState();
 
-   double oneFullWin = RiskPercent * RewardRisk;
-   if(DailyProfitCapPercent <= oneFullWin)
-      Print("MicroMAP warning: profit cap is at or below one full winner, so one win can end the day.");
-   if(DailyLossCapPercent < RiskPercent * MaxAttempts)
-      Print("MicroMAP warning: loss cap is below MaxAttempts full stops; the 3-try chain may be cut short.");
-
    int curSpread = (int)MarketInfo(Symbol(), MODE_SPREAD);
    Print("MicroMAP started. symbol=", Symbol(),
          " digits=", Digits,
@@ -145,7 +140,9 @@ int OnInit()
          " mode=", (int)EntryMode,
          " risk=", DoubleToString(RiskPercent, 2),
          "% RR=", DoubleToString(RewardRisk, 2),
-         " attempts=", MaxAttempts);
+         " attempts=", MaxAttempts,
+         " maxTrades/day=", MaxTradesPerDay,
+         " stopAfterFirstWin=", (StopAfterFirstWin ? "yes" : "no"));
    if(curSpread > MaxSpreadPoints)
       Print("MicroMAP warning: current spread ", curSpread,
             " is already above MaxSpreadPoints=", MaxSpreadPoints,
@@ -206,10 +203,8 @@ void OnTick()
       {
          if(!InEntryWindow())
             NoteSkip("outside entry window");
-         else if(ProfitCapHit())
-            NoteSkip("daily profit cap hit");
-         else if(LossCapHit())
-            NoteSkip("daily loss cap hit");
+         else if(!CanOpenNewTradeToday())
+            NoteSkip(DailyBlockReason());
          else
             ScanForSetup();
       }
@@ -436,6 +431,7 @@ void RefreshDayStats()
    g_statsGrossProfit = 0.0;
    g_statsGrossLoss = 0.0;
    g_statsTrades = 0;
+   g_statsHadWin = false;
 
    for(int i = orders - 1; i >= 0; i--)
    {
@@ -458,7 +454,10 @@ void RefreshDayStats()
          continue;
       double pl = OrderProfit() + OrderSwap() + OrderCommission();
       if(pl > 0.0)
+      {
          g_statsGrossProfit += pl;
+         g_statsHadWin = true;
+      }
       else if(pl < 0.0)
          g_statsGrossLoss += -pl;
    }
@@ -472,20 +471,6 @@ double TodayClosedNet()
 }
 
 //+------------------------------------------------------------------+
-double TodayGrossProfit()
-{
-   RefreshDayStats();
-   return g_statsGrossProfit;
-}
-
-//+------------------------------------------------------------------+
-double TodayGrossLoss()
-{
-   RefreshDayStats();
-   return g_statsGrossLoss;
-}
-
-//+------------------------------------------------------------------+
 int TradesOpenedToday()
 {
    RefreshDayStats();
@@ -493,19 +478,36 @@ int TradesOpenedToday()
 }
 
 //+------------------------------------------------------------------+
-bool ProfitCapHit()
+bool HadWinningCloseToday()
 {
-   if(g_anchor <= 0.0)
-      return true;
-   return (TodayGrossProfit() >= g_anchor * DailyProfitCapPercent / 100.0);
+   RefreshDayStats();
+   return g_statsHadWin;
 }
 
 //+------------------------------------------------------------------+
-bool LossCapHit()
+bool DailyTradeLimitHit()
 {
-   if(g_anchor <= 0.0)
-      return true;
-   return (TodayGrossLoss() >= g_anchor * DailyLossCapPercent / 100.0);
+   return (TradesOpenedToday() >= MaxTradesPerDay);
+}
+
+//+------------------------------------------------------------------+
+bool CanOpenNewTradeToday()
+{
+   if(StopAfterFirstWin && HadWinningCloseToday())
+      return false;
+   if(DailyTradeLimitHit())
+      return false;
+   return true;
+}
+
+//+------------------------------------------------------------------+
+string DailyBlockReason()
+{
+   if(StopAfterFirstWin && HadWinningCloseToday())
+      return "stopped: first win of day already taken";
+   if(DailyTradeLimitHit())
+      return "stopped: max " + IntegerToString(MaxTradesPerDay) + " trades/day";
+   return "ready";
 }
 
 //+------------------------------------------------------------------+
@@ -766,6 +768,11 @@ bool ResolveEntryLevels(int dir, int mcStart, int mcEnd, double mcH, double mcL,
 //+------------------------------------------------------------------+
 void ScanForSetup()
 {
+   if(!CanOpenNewTradeToday())
+   {
+      NoteSkip(DailyBlockReason());
+      return;
+   }
    if(CountMarket() > 0 || CountPending() > 0)
    {
       NoteSkip("already have market/pending");
@@ -916,6 +923,11 @@ bool StopsOk(int type, double entry, double sl, double tp)
 //+------------------------------------------------------------------+
 bool PlacePending(int dir, double entry, double sl, int attempt)
 {
+   if(!CanOpenNewTradeToday())
+   {
+      NoteSkip(DailyBlockReason());
+      return false;
+   }
    if(CountMarket() > 0 || CountPending() > 0)
    {
       NoteSkip("already have market/pending");
@@ -1123,7 +1135,13 @@ void ManageOpenTrade()
       if(stopped)
          HandleStopOut();
       else
-         ResetSetup(true); // winner: cool down briefly then look for next setup
+      {
+         // First win of the day ends trading for that day when StopAfterFirstWin is on.
+         Print("MicroMAP winning close. daily entries locked=",
+               ((StopAfterFirstWin) ? "yes" : "no"));
+         CancelOurPending();
+         ResetSetup(true);
+      }
       return;
    }
 
@@ -1138,6 +1156,12 @@ void ManageOpenTrade()
 //+------------------------------------------------------------------+
 void HandleStopOut()
 {
+   if(!CanOpenNewTradeToday())
+   {
+      NoteSkip(DailyBlockReason());
+      InvalidateSetup();
+      return;
+   }
    if(EntryMode != MM_CLASSIC_CHAIN)
    {
       // confirm modes do not chain retries by design
@@ -1208,8 +1232,16 @@ void TryPlaceRetry()
 {
    if(g_state != ST_WAIT_RETRY)
       return;
-   if(!InEntryWindow() || ProfitCapHit() || LossCapHit())
+   if(!InEntryWindow() || !CanOpenNewTradeToday())
+   {
+      if(!CanOpenNewTradeToday())
+      {
+         NoteSkip(DailyBlockReason());
+         CancelOurPending();
+         ResetSetup(false);
+      }
       return;
+   }
    if(CountMarket() > 0 || CountPending() > 0)
       return;
 
@@ -1307,10 +1339,8 @@ string StateName()
 //+------------------------------------------------------------------+
 string StatusText()
 {
-   if(LossCapHit())
-      return "stopped: daily loss cap";
-   if(ProfitCapHit())
-      return "stopped: daily profit cap";
+   if(!CanOpenNewTradeToday())
+      return DailyBlockReason();
    if(MustBeFlat() || !InEntryWindow())
       return "outside entry window";
    return StateName();
@@ -1319,8 +1349,6 @@ string StatusText()
 //+------------------------------------------------------------------+
 void Panel()
 {
-   double profitCap = g_anchor * DailyProfitCapPercent / 100.0;
-   double lossCap = g_anchor * DailyLossCapPercent / 100.0;
    int spread = (int)MarketInfo(Symbol(), MODE_SPREAD);
    Comment("MicroMAP  ", StatusText(),
            "\nTF=", IntegerToString((int)g_tf),
@@ -1330,12 +1358,11 @@ void Panel()
            "\nScanned bars: ", IntegerToString(g_scanBars),
            "  spike hits: ", IntegerToString(g_spikeHits),
            "  MC hits: ", IntegerToString(g_mcHits),
-           "\nGross profit: ", DoubleToString(TodayGrossProfit(), 2),
-           " / ", DoubleToString(profitCap, 2),
-           "    gross loss: ", DoubleToString(TodayGrossLoss(), 2),
-           " / ", DoubleToString(lossCap, 2),
+           "\nDay net: ", DoubleToString(TodayClosedNet(), 2),
+           "    win today: ", (HadWinningCloseToday() ? "yes" : "no"),
            "\nSignals today: ", IntegerToString(g_signals),
            "    trades opened today: ", IntegerToString(TradesOpenedToday()),
+           " / ", IntegerToString(MaxTradesPerDay),
            "    open: ", IntegerToString(CountMarket()),
            " pending: ", IntegerToString(CountPending()));
 }

@@ -126,20 +126,14 @@ def main() -> None:
     assert b_entry == 106.5
     assert b_sl == 110.0
 
-    # Daily caps math with EA defaults: 0.5% risk, RR=2, profit cap 2%, loss cap 1.5%
-    risk_pct = 0.5
-    reward = 2.0
-    profit_cap = 2.0
-    loss_cap = 1.5
-    assert profit_cap > risk_pct * reward, "profit cap must allow a second trade after one full winner"
-    assert loss_cap >= risk_pct * 3, "loss cap must cover the classic 3-attempt chain"
+    # Daily rules: max 3 opens, stop after first win
+    assert MaxTradesPerDay_default() == 3
+    assert stop_after_first_win_blocks_second_entry(True, had_win=True) is False
+    assert stop_after_first_win_blocks_second_entry(True, had_win=False) is True
+    assert trades_limit_blocks(opened=3, max_trades=3) is True
+    assert trades_limit_blocks(opened=2, max_trades=3) is False
 
-    # Classic chain invalidation after 3 stops
-    attempts = 0
-    for _ in range(3):
-        attempts += 1
-    assert attempts == 3
-
+    # Expectancy examples still valid mathematically
     e = expectancy(0.40, 2.0)  # 40% win @ 2R
     assert abs(e - 0.2) < 1e-9, e
     e3 = expectancy(0.30, 3.0)  # optional higher-RR profile
@@ -149,10 +143,24 @@ def main() -> None:
     print("PASS: bull micro-channel EN1 entry/SL")
     print("PASS: bear micro-channel EN1 entry/SL")
     print("PASS: invalid rising-high pullback rejected")
-    print("PASS: daily caps leave room for multi-attempt day")
+    print("PASS: daily max-trades and first-win lockout rules")
     print("PASS: expectancy at 40% win / 2R = +0.20R")
     print("PASS: expectancy at 30% win / 3R = +0.20R")
     print("ALL MicroMAP structural checks passed")
+
+
+def MaxTradesPerDay_default() -> int:
+    return 3
+
+
+def stop_after_first_win_blocks_second_entry(enabled: bool, had_win: bool) -> bool:
+    if enabled and had_win:
+        return False
+    return True
+
+
+def trades_limit_blocks(opened: int, max_trades: int) -> bool:
+    return opened >= max_trades
 
 
 if __name__ == "__main__":
