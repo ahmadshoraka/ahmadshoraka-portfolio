@@ -12,7 +12,7 @@
 //+------------------------------------------------------------------+
 #property copyright "MicroMAP EA"
 #property link      "https://poursamadi.com/micromap/"
-#property version   "1.00"
+#property version   "1.01"
 #property strict
 #property description "Spike + micro-channel entries with up to 3 attempts."
 #property description "One position. Daily gross profit/loss caps."
@@ -32,26 +32,27 @@ input double             DailyLossCapPercent   = 1.5;   // stop new trades after
 input double             RewardRisk            = 2.0;   // TP distance / SL distance (page: min ~2)
 input ENUM_MM_ENTRY_MODE EntryMode             = MM_CLASSIC_CHAIN;
 input int                MaxAttempts           = 3;     // invalidate setup after this many stops
+input bool               UseChartTimeframe     = true;  // if true, ignore SignalTF and use the chart TF
 input ENUM_TIMEFRAMES    SignalTF              = PERIOD_M5;
-input int                SpikeLookback         = 30;
+input int                SpikeLookback         = 40;
 input int                AtrPeriod             = 14;
-input double             SpikeBodyAtrMin       = 1.2;   // spike body >= ATR * this
-input double             SpikeCloseBias        = 0.70;  // close in top/bottom fraction of range
-input double             SpikeShadowMax        = 0.30;  // opposing wick <= range * this
+input double             SpikeBodyAtrMin       = 1.0;   // spike body >= ATR * this
+input double             SpikeCloseBias        = 0.65;  // close in top/bottom fraction of range
+input double             SpikeShadowMax        = 0.35;  // opposing wick <= range * this
 input int                MicroMinBars          = 2;
-input int                MicroMaxBars          = 8;
-input double             MicroMaxBodyVsSpike   = 0.70;  // each MC body <= spike body * this
+input int                MicroMaxBars          = 12;
+input double             MicroMaxBodyVsSpike   = 0.85;  // each MC body <= spike body * this
 input double             BreakBufferPoints     = 2.0;   // stop-order offset beyond H/L
-input double             MinSlSpreadMultiple   = 3.0;
-input int                StartHour             = 8;     // broker server time
-input int                EndHour               = 20;
-input int                FridayStopHour        = 20;
-input int                MinMinutesBeforeClose = 60;
-input bool               CloseAtSessionEnd     = true;
+input double             MinSlSpreadMultiple   = 1.2;   // gold/indices need looser than FX
+input int                StartHour             = 0;     // 0-24 broker server time; 0/24 = almost full day
+input int                EndHour               = 24;
+input int                FridayStopHour        = 22;
+input int                MinMinutesBeforeClose = 0;
+input bool               CloseAtSessionEnd     = false;
 input bool               FlatBeforeWeekend     = true;
 input bool               TradeOnSunday         = false;
-input int                MaxSpreadPoints       = 30;
-input int                SlippagePoints        = 30;
+input int                MaxSpreadPoints       = 800;   // XAU/US30 spreads are often hundreds of points
+input int                SlippagePoints        = 80;
 input bool               CancelPendingOnBreak  = true;  // cancel if structure invalidates
 input bool               DrawMarkers           = true;
 
@@ -81,6 +82,23 @@ int      g_statsHistory   = -1;
 double   g_statsGrossProfit = 0.0;
 double   g_statsGrossLoss   = 0.0;
 int      g_statsTrades      = 0;
+ENUM_TIMEFRAMES g_tf        = PERIOD_M5;
+string   g_lastSkip         = "";
+int      g_scanBars         = 0;
+int      g_spikeHits        = 0;
+int      g_mcHits           = 0;
+
+//+------------------------------------------------------------------+
+void NoteSkip(string reason)
+{
+   g_lastSkip = reason;
+}
+
+//+------------------------------------------------------------------+
+void RefreshTF()
+{
+   g_tf = UseChartTimeframe ? (ENUM_TIMEFRAMES)Period() : SignalTF;
+}
 
 //+------------------------------------------------------------------+
 int OnInit()
@@ -104,6 +122,8 @@ int OnInit()
    if(MaxSpreadPoints < 0 || SlippagePoints < 0)
       return INIT_PARAMETERS_INCORRECT;
 
+   RefreshTF();
+
    if(IsTesting())
       ClearGlobals();
 
@@ -115,10 +135,22 @@ int OnInit()
    if(DailyLossCapPercent < RiskPercent * MaxAttempts)
       Print("MicroMAP warning: loss cap is below MaxAttempts full stops; the 3-try chain may be cut short.");
 
-   Print("MicroMAP started. mode=", (int)EntryMode,
+   int curSpread = (int)MarketInfo(Symbol(), MODE_SPREAD);
+   Print("MicroMAP started. symbol=", Symbol(),
+         " digits=", Digits,
+         " point=", DoubleToString(Point, Digits),
+         " spread=", curSpread,
+         " maxSpread=", MaxSpreadPoints,
+         " tf=", (int)g_tf,
+         " mode=", (int)EntryMode,
          " risk=", DoubleToString(RiskPercent, 2),
          "% RR=", DoubleToString(RewardRisk, 2),
          " attempts=", MaxAttempts);
+   if(curSpread > MaxSpreadPoints)
+      Print("MicroMAP warning: current spread ", curSpread,
+            " is already above MaxSpreadPoints=", MaxSpreadPoints,
+            ". Raise MaxSpreadPoints for XAU/US30.");
+   NoteSkip("init ok");
    return INIT_SUCCEEDED;
 }
 
@@ -132,10 +164,20 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTick()
 {
+   RefreshTF();
+
    if(iTime(Symbol(), PERIOD_D1, 0) <= 0)
+   {
+      NoteSkip("waiting for D1 time");
+      Panel();
       return;
-   if(iBars(Symbol(), SignalTF) < SpikeLookback + MicroMaxBars + AtrPeriod + 5)
+   }
+   if(iBars(Symbol(), g_tf) < SpikeLookback + MicroMaxBars + AtrPeriod + 5)
+   {
+      NoteSkip("not enough bars on signal TF");
+      Panel();
       return;
+   }
 
    SyncDay();
    ManageOpenTrade();
@@ -143,6 +185,7 @@ void OnTick()
 
    if(MustBeFlat())
    {
+      NoteSkip("flat session / weekend rule");
       CancelOurPending();
       CloseOurPositions();
       Panel();
@@ -155,12 +198,21 @@ void OnTick()
    if(g_state == ST_WAIT_RETRY)
       TryPlaceRetry();
 
-   datetime closedBar = iTime(Symbol(), SignalTF, 1);
+   datetime closedBar = iTime(Symbol(), g_tf, 1);
    if(closedBar > 0 && !BarHandled(closedBar) && !IsTradeContextBusy())
    {
       MarkBar(closedBar);
-      if(g_state == ST_IDLE && InEntryWindow() && !ProfitCapHit() && !LossCapHit())
-         ScanForSetup();
+      if(g_state == ST_IDLE)
+      {
+         if(!InEntryWindow())
+            NoteSkip("outside entry window");
+         else if(ProfitCapHit())
+            NoteSkip("daily profit cap hit");
+         else if(LossCapHit())
+            NoteSkip("daily loss cap hit");
+         else
+            ScanForSetup();
+      }
    }
 
    Panel();
@@ -471,13 +523,13 @@ double BufferDist()
 //+------------------------------------------------------------------+
 double BodySize(int shift)
 {
-   return MathAbs(iClose(Symbol(), SignalTF, shift) - iOpen(Symbol(), SignalTF, shift));
+   return MathAbs(iClose(Symbol(), g_tf, shift) - iOpen(Symbol(), g_tf, shift));
 }
 
 //+------------------------------------------------------------------+
 double RangeSize(int shift)
 {
-   return iHigh(Symbol(), SignalTF, shift) - iLow(Symbol(), SignalTF, shift);
+   return iHigh(Symbol(), g_tf, shift) - iLow(Symbol(), g_tf, shift);
 }
 
 //+------------------------------------------------------------------+
@@ -486,14 +538,14 @@ bool IsBullSpike(int shift)
    double range = RangeSize(shift);
    if(range <= Point)
       return false;
-   double atr = iATR(Symbol(), SignalTF, AtrPeriod, shift);
+   double atr = iATR(Symbol(), g_tf, AtrPeriod, shift);
    if(atr <= 0.0)
       return false;
    double body = BodySize(shift);
-   double close = iClose(Symbol(), SignalTF, shift);
-   double open = iOpen(Symbol(), SignalTF, shift);
-   double low = iLow(Symbol(), SignalTF, shift);
-   double high = iHigh(Symbol(), SignalTF, shift);
+   double close = iClose(Symbol(), g_tf, shift);
+   double open = iOpen(Symbol(), g_tf, shift);
+   double low = iLow(Symbol(), g_tf, shift);
+   double high = iHigh(Symbol(), g_tf, shift);
    if(close <= open)
       return false;
    if(body < atr * SpikeBodyAtrMin)
@@ -511,14 +563,14 @@ bool IsBearSpike(int shift)
    double range = RangeSize(shift);
    if(range <= Point)
       return false;
-   double atr = iATR(Symbol(), SignalTF, AtrPeriod, shift);
+   double atr = iATR(Symbol(), g_tf, AtrPeriod, shift);
    if(atr <= 0.0)
       return false;
    double body = BodySize(shift);
-   double close = iClose(Symbol(), SignalTF, shift);
-   double open = iOpen(Symbol(), SignalTF, shift);
-   double low = iLow(Symbol(), SignalTF, shift);
-   double high = iHigh(Symbol(), SignalTF, shift);
+   double close = iClose(Symbol(), g_tf, shift);
+   double open = iOpen(Symbol(), g_tf, shift);
+   double low = iLow(Symbol(), g_tf, shift);
+   double high = iHigh(Symbol(), g_tf, shift);
    if(close >= open)
       return false;
    if(body < atr * SpikeBodyAtrMin)
@@ -533,8 +585,8 @@ bool IsBearSpike(int shift)
 //+------------------------------------------------------------------+
 bool IsInsideBar(int motherShift, int childShift)
 {
-   return (iHigh(Symbol(), SignalTF, childShift) <= iHigh(Symbol(), SignalTF, motherShift) &&
-           iLow(Symbol(), SignalTF, childShift)  >= iLow(Symbol(), SignalTF, motherShift));
+   return (iHigh(Symbol(), g_tf, childShift) <= iHigh(Symbol(), g_tf, motherShift) &&
+           iLow(Symbol(), g_tf, childShift)  >= iLow(Symbol(), g_tf, motherShift));
 }
 
 //+------------------------------------------------------------------+
@@ -574,12 +626,12 @@ bool BuildMicroChannel(int spikeShift, int dir, double spikeBody,
       if(dir > 0)
       {
          // counter down: each high should not rise above prior micro high path
-         if(s < mcStart && iHigh(Symbol(), SignalTF, s) > iHigh(Symbol(), SignalTF, s + 1) + Point)
+         if(s < mcStart && iHigh(Symbol(), g_tf, s) > iHigh(Symbol(), g_tf, s + 1) + Point)
             break;
       }
       else
       {
-         if(s < mcStart && iLow(Symbol(), SignalTF, s) < iLow(Symbol(), SignalTF, s + 1) - Point)
+         if(s < mcStart && iLow(Symbol(), g_tf, s) < iLow(Symbol(), g_tf, s + 1) - Point)
             break;
       }
       len++;
@@ -594,25 +646,25 @@ bool BuildMicroChannel(int spikeShift, int dir, double spikeBody,
    if(mcEnd != 1)
       return false;
 
-   h1 = iHigh(Symbol(), SignalTF, 1);
-   l1 = iLow(Symbol(), SignalTF, 1);
+   h1 = iHigh(Symbol(), g_tf, 1);
+   l1 = iLow(Symbol(), g_tf, 1);
    for(int i = mcEnd; i <= mcStart; i++)
    {
-      if(iHigh(Symbol(), SignalTF, i) > h1)
-         h1 = iHigh(Symbol(), SignalTF, i);
-      if(iLow(Symbol(), SignalTF, i) < l1)
-         l1 = iLow(Symbol(), SignalTF, i);
+      if(iHigh(Symbol(), g_tf, i) > h1)
+         h1 = iHigh(Symbol(), g_tf, i);
+      if(iLow(Symbol(), g_tf, i) < l1)
+         l1 = iLow(Symbol(), g_tf, i);
    }
 
    // Directional sanity: pullback against spike
    if(dir > 0)
    {
-      if(iClose(Symbol(), SignalTF, 1) >= iClose(Symbol(), SignalTF, spikeShift))
+      if(iClose(Symbol(), g_tf, 1) >= iClose(Symbol(), g_tf, spikeShift))
          return false;
    }
    else
    {
-      if(iClose(Symbol(), SignalTF, 1) <= iClose(Symbol(), SignalTF, spikeShift))
+      if(iClose(Symbol(), g_tf, 1) <= iClose(Symbol(), g_tf, spikeShift))
          return false;
    }
    return true;
@@ -629,13 +681,13 @@ bool ResolveEntryLevels(int dir, int mcStart, int mcEnd, double mcH, double mcL,
    {
       if(dir > 0)
       {
-         entry = iHigh(Symbol(), SignalTF, 1) + BufferDist();
-         sl = iLow(Symbol(), SignalTF, 1) - BufferDist();
+         entry = iHigh(Symbol(), g_tf, 1) + BufferDist();
+         sl = iLow(Symbol(), g_tf, 1) - BufferDist();
       }
       else
       {
-         entry = iLow(Symbol(), SignalTF, 1) - BufferDist();
-         sl = iHigh(Symbol(), SignalTF, 1) + BufferDist();
+         entry = iLow(Symbol(), g_tf, 1) - BufferDist();
+         sl = iHigh(Symbol(), g_tf, 1) + BufferDist();
       }
       return (MathAbs(entry - sl) > Point);
    }
@@ -652,7 +704,7 @@ bool ResolveEntryLevels(int dir, int mcStart, int mcEnd, double mcH, double mcL,
          double last = -1.0;
          for(int s = mcStart; s >= 1; s--)
          {
-            double h = iHigh(Symbol(), SignalTF, s);
+            double h = iHigh(Symbol(), g_tf, s);
             if(last < 0.0 || h > last + Point)
             {
                int n = ArraySize(levels);
@@ -669,7 +721,7 @@ bool ResolveEntryLevels(int dir, int mcStart, int mcEnd, double mcH, double mcL,
          bool have = false;
          for(int s = mcStart; s >= 1; s--)
          {
-            double l = iLow(Symbol(), SignalTF, s);
+            double l = iLow(Symbol(), g_tf, s);
             if(!have || l < last - Point)
             {
                int n = ArraySize(levels);
@@ -700,12 +752,12 @@ bool ResolveEntryLevels(int dir, int mcStart, int mcEnd, double mcH, double mcL,
    if(dir > 0)
    {
       // Buy stop above last MC high (page: last ceiling H1)
-      entry = iHigh(Symbol(), SignalTF, 1) + BufferDist();
+      entry = iHigh(Symbol(), g_tf, 1) + BufferDist();
       sl = mcL - BufferDist();
    }
    else
    {
-      entry = iLow(Symbol(), SignalTF, 1) - BufferDist();
+      entry = iLow(Symbol(), g_tf, 1) - BufferDist();
       sl = mcH + BufferDist();
    }
    return (MathAbs(entry - sl) > Point);
@@ -715,8 +767,12 @@ bool ResolveEntryLevels(int dir, int mcStart, int mcEnd, double mcH, double mcL,
 void ScanForSetup()
 {
    if(CountMarket() > 0 || CountPending() > 0)
+   {
+      NoteSkip("already have market/pending");
       return;
+   }
 
+   g_scanBars++;
    int spikeShift = -1;
    int dir = 0;
    double spikeBody = 0.0;
@@ -725,6 +781,7 @@ void ScanForSetup()
    double mcH = 0.0;
    double mcL = 0.0;
    bool found = false;
+   int spikes = 0;
 
    // Prefer the nearest spike that still has a live micro-channel ending on bar 1.
    for(int s = 1 + MicroMinBars; s <= SpikeLookback; s++)
@@ -733,6 +790,7 @@ void ScanForSetup()
       double body;
       if(!TrySpikeAt(s, d, body))
          continue;
+      spikes++;
       int start, end;
       double h, l;
       if(!BuildMicroChannel(s, d, body, start, end, h, l))
@@ -747,18 +805,29 @@ void ScanForSetup()
       found = true;
       break;
    }
+   g_spikeHits += spikes;
    if(!found)
+   {
+      if(spikes == 0)
+         NoteSkip("no spike in lookback");
+      else
+         NoteSkip("spike found but no valid micro-channel to bar1");
       return;
+   }
+   g_mcHits++;
 
    double entry, sl;
    if(!ResolveEntryLevels(dir, mcStart, mcEnd, mcH, mcL, entry, sl))
+   {
+      NoteSkip("entry levels not resolved for mode");
       return;
+   }
 
    g_signals++;
    GlobalVariableSet(Prefix() + "SIG", (double)g_signals);
    g_dir = dir;
    g_attempt = 1;
-   g_setupBar = iTime(Symbol(), SignalTF, 1);
+   g_setupBar = iTime(Symbol(), g_tf, 1);
    g_entryLevel = NormPrice(entry);
    g_slLevel = NormPrice(sl);
 
@@ -774,20 +843,22 @@ void ScanForSetup()
 
    if(!PlacePending(g_dir, g_entryLevel, g_slLevel, g_attempt))
       ResetSetup(false);
+   else
+      NoteSkip("pending placed");
 }
 
 //+------------------------------------------------------------------+
 void MarkSetup(int dir, int spikeShift, int mcStart)
 {
    string tag = "MM_" + IntegerToString(MagicNumber) + "_" + IntegerToString((int)TimeCurrent());
-   datetime tSpike = iTime(Symbol(), SignalTF, spikeShift);
-   datetime tMc = iTime(Symbol(), SignalTF, 1);
+   datetime tSpike = iTime(Symbol(), g_tf, spikeShift);
+   datetime tMc = iTime(Symbol(), g_tf, 1);
    ObjectCreate(0, tag + "_SP", OBJ_ARROW, 0, tSpike,
-                dir > 0 ? iLow(Symbol(), SignalTF, spikeShift) : iHigh(Symbol(), SignalTF, spikeShift));
+                dir > 0 ? iLow(Symbol(), g_tf, spikeShift) : iHigh(Symbol(), g_tf, spikeShift));
    ObjectSetInteger(0, tag + "_SP", OBJPROP_ARROWCODE, dir > 0 ? 233 : 234);
    ObjectSetInteger(0, tag + "_SP", OBJPROP_COLOR, dir > 0 ? clrDodgerBlue : clrOrangeRed);
-   ObjectCreate(0, tag + "_MC", OBJ_RECTANGLE, 0, iTime(Symbol(), SignalTF, mcStart),
-                iHigh(Symbol(), SignalTF, mcStart), tMc, iLow(Symbol(), SignalTF, 1));
+   ObjectCreate(0, tag + "_MC", OBJ_RECTANGLE, 0, iTime(Symbol(), g_tf, mcStart),
+                iHigh(Symbol(), g_tf, mcStart), tMc, iLow(Symbol(), g_tf, 1));
    ObjectSetInteger(0, tag + "_MC", OBJPROP_COLOR, clrDimGray);
    ObjectSetInteger(0, tag + "_MC", OBJPROP_BACK, true);
    ObjectSetInteger(0, tag + "_MC", OBJPROP_FILL, false);
@@ -846,14 +917,19 @@ bool StopsOk(int type, double entry, double sl, double tp)
 bool PlacePending(int dir, double entry, double sl, int attempt)
 {
    if(CountMarket() > 0 || CountPending() > 0)
+   {
+      NoteSkip("already have market/pending");
       return false;
+   }
    if(!IsTesting() && !IsExpertEnabled())
    {
+      NoteSkip("AutoTrading off");
       Print("MicroMAP skipped: AutoTrading off");
       return false;
    }
    if(!IsTradeAllowed())
    {
+      NoteSkip("trading not allowed");
       Print("MicroMAP skipped: trading not allowed");
       return false;
    }
@@ -861,7 +937,8 @@ bool PlacePending(int dir, double entry, double sl, int attempt)
    int spread = (int)MarketInfo(Symbol(), MODE_SPREAD);
    if(spread > MaxSpreadPoints)
    {
-      Print("MicroMAP skipped: spread ", spread);
+      NoteSkip("spread " + IntegerToString(spread) + " > max " + IntegerToString(MaxSpreadPoints));
+      Print("MicroMAP skipped: spread ", spread, " > ", MaxSpreadPoints);
       return false;
    }
 
@@ -870,6 +947,7 @@ bool PlacePending(int dir, double entry, double sl, int attempt)
                             spread * Point * MinSlSpreadMultiple);
    if(slDist < minDist)
    {
+      NoteSkip("SL too tight vs spread/stopLevel");
       Print("MicroMAP skipped: SL too tight vs spread/stop level");
       return false;
    }
@@ -877,6 +955,7 @@ bool PlacePending(int dir, double entry, double sl, int attempt)
    double lots = LotForRisk(slDist);
    if(lots <= 0.0)
    {
+      NoteSkip("lot below broker minimum for risk");
       Print("MicroMAP skipped: lot below broker minimum");
       return false;
    }
@@ -903,6 +982,7 @@ bool PlacePending(int dir, double entry, double sl, int attempt)
 
    if(!StopsOk(type, entry, sl, tp))
    {
+      NoteSkip("stops rejected by stop level");
       Print("MicroMAP skipped: stops rejected by stop level");
       return false;
    }
@@ -918,6 +998,7 @@ bool PlacePending(int dir, double entry, double sl, int attempt)
       if(ticket > 0)
          break;
       int err = GetLastError();
+      NoteSkip("OrderSend err " + IntegerToString(err));
       Print("MicroMAP OrderSend pending failed. err=", err);
       if(err != 129 && err != 135 && err != 136 && err != 138 && err != 146 && err != 130)
          break;
@@ -1070,7 +1151,7 @@ void HandleStopOut()
    }
 
    g_attempt++;
-   g_waitBar = iTime(Symbol(), SignalTF, 0);
+   g_waitBar = iTime(Symbol(), g_tf, 0);
    g_state = ST_WAIT_RETRY;
    SaveState();
    Print("MicroMAP waiting for EN", g_attempt, " after stop");
@@ -1081,7 +1162,7 @@ void InvalidateSetup()
 {
    Print("MicroMAP setup invalidated after ", g_attempt, " stop(s)");
    g_state = ST_COOLDOWN;
-   g_cooldownUntil = TimeCurrent() + TfToSeconds(SignalTF) * 3;
+   g_cooldownUntil = TimeCurrent() + TfToSeconds(g_tf) * 3;
    g_dir = 0;
    g_attempt = 0;
    g_pendingTicket = -1;
@@ -1094,7 +1175,7 @@ void ResetSetup(bool afterWin)
 {
    g_state = afterWin ? ST_COOLDOWN : ST_IDLE;
    if(afterWin)
-      g_cooldownUntil = TimeCurrent() + TfToSeconds(SignalTF);
+      g_cooldownUntil = TimeCurrent() + TfToSeconds(g_tf);
    else
       g_cooldownUntil = 0;
    g_dir = 0;
@@ -1133,27 +1214,27 @@ void TryPlaceRetry()
       return;
 
    // Wait for at least one new closed candle after the stop
-   datetime bar1 = iTime(Symbol(), SignalTF, 1);
+   datetime bar1 = iTime(Symbol(), g_tf, 1);
    if(bar1 <= 0 || bar1 <= g_waitBar)
       return;
 
    double entry, sl;
    if(g_dir > 0)
    {
-      entry = iHigh(Symbol(), SignalTF, 1) + BufferDist();
+      entry = iHigh(Symbol(), g_tf, 1) + BufferDist();
       // EN2: SL at newest lowest low; EN3: SL at that candle low (page)
       if(g_attempt >= 3)
-         sl = iLow(Symbol(), SignalTF, 1) - BufferDist();
+         sl = iLow(Symbol(), g_tf, 1) - BufferDist();
       else
-         sl = MathMin(iLow(Symbol(), SignalTF, 1), iLow(Symbol(), SignalTF, 2)) - BufferDist();
+         sl = MathMin(iLow(Symbol(), g_tf, 1), iLow(Symbol(), g_tf, 2)) - BufferDist();
    }
    else
    {
-      entry = iLow(Symbol(), SignalTF, 1) - BufferDist();
+      entry = iLow(Symbol(), g_tf, 1) - BufferDist();
       if(g_attempt >= 3)
-         sl = iHigh(Symbol(), SignalTF, 1) + BufferDist();
+         sl = iHigh(Symbol(), g_tf, 1) + BufferDist();
       else
-         sl = MathMax(iHigh(Symbol(), SignalTF, 1), iHigh(Symbol(), SignalTF, 2)) + BufferDist();
+         sl = MathMax(iHigh(Symbol(), g_tf, 1), iHigh(Symbol(), g_tf, 2)) + BufferDist();
    }
 
    g_entryLevel = NormPrice(entry);
@@ -1240,7 +1321,15 @@ void Panel()
 {
    double profitCap = g_anchor * DailyProfitCapPercent / 100.0;
    double lossCap = g_anchor * DailyLossCapPercent / 100.0;
+   int spread = (int)MarketInfo(Symbol(), MODE_SPREAD);
    Comment("MicroMAP  ", StatusText(),
+           "\nTF=", IntegerToString((int)g_tf),
+           "  spread=", IntegerToString(spread),
+           " / max=", IntegerToString(MaxSpreadPoints),
+           "\nLast skip: ", g_lastSkip,
+           "\nScanned bars: ", IntegerToString(g_scanBars),
+           "  spike hits: ", IntegerToString(g_spikeHits),
+           "  MC hits: ", IntegerToString(g_mcHits),
            "\nGross profit: ", DoubleToString(TodayGrossProfit(), 2),
            " / ", DoubleToString(profitCap, 2),
            "    gross loss: ", DoubleToString(TodayGrossLoss(), 2),
