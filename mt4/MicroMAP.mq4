@@ -12,10 +12,10 @@
 //+------------------------------------------------------------------+
 #property copyright "MicroMAP EA"
 #property link      "https://poursamadi.com/micromap/"
-#property version   "1.03"
+#property version   "1.04"
 #property strict
-#property description "Spike + micro-channel entries with up to 3 attempts."
-#property description "Chart TF + live chart spread. Max 3 opens/day. Stop after first win."
+#property description "Quality filters: H2, H1 trend, ATR stop floor, 1 attempt."
+#property description "Chart TF + live spread. Max 3 opens/day. Stop after first win."
 
 enum ENUM_MM_ENTRY_MODE
 {
@@ -30,18 +30,23 @@ input double             RiskPercent           = 0.5;   // risk per trade, % of 
 input int                MaxTradesPerDay       = 3;     // max market positions opened per day
 input bool               StopAfterFirstWin     = true;  // no more entries after first winning close today
 input double             RewardRisk            = 2.0;   // TP distance / SL distance (page: min ~2)
-input ENUM_MM_ENTRY_MODE EntryMode             = MM_CLASSIC_CHAIN;
-input int                MaxAttempts           = 3;     // invalidate setup after this many stops
+input ENUM_MM_ENTRY_MODE EntryMode             = MM_H2_CONFIRM;
+input int                MaxAttempts           = 1;     // 1 = no revenge re-entries after a stop
 input int                SpikeLookback         = 40;
 input int                AtrPeriod             = 14;
-input double             SpikeBodyAtrMin       = 1.0;   // spike body >= ATR * this
+input double             SpikeBodyAtrMin       = 1.2;   // spike body >= ATR * this
 input double             SpikeCloseBias        = 0.65;  // close in top/bottom fraction of range
 input double             SpikeShadowMax        = 0.35;  // opposing wick <= range * this
-input int                MicroMinBars          = 2;
+input int                MicroMinBars          = 3;     // reject tiny 2-bar noise channels
 input int                MicroMaxBars          = 12;
 input double             MicroMaxBodyVsSpike   = 0.85;  // each MC body <= spike body * this
 input double             BreakBufferPoints     = 2.0;   // stop-order offset beyond H/L
 input double             MinSlSpreadMultiple   = 1.2;   // min SL distance vs live chart spread
+input double             MinSlAtrMultiple      = 1.0;   // 0=off; widen SL to at least ATR*this
+input bool               UseTrendFilter        = true;  // only trade with higher-TF EMA trend
+input ENUM_TIMEFRAMES    TrendTF               = PERIOD_H1;
+input int                TrendFastMA           = 34;
+input int                TrendSlowMA           = 89;
 input int                StartHour             = 0;     // 0-24 broker server time; 0/24 = almost full day
 input int                EndHour               = 24;
 input int                FridayStopHour        = 22;
@@ -130,6 +135,10 @@ int OnInit()
       return INIT_PARAMETERS_INCORRECT;
    if(MicroMaxBodyVsSpike <= 0.0 || BreakBufferPoints < 0.0 || MinSlSpreadMultiple <= 0.0)
       return INIT_PARAMETERS_INCORRECT;
+   if(MinSlAtrMultiple < 0.0)
+      return INIT_PARAMETERS_INCORRECT;
+   if(UseTrendFilter && (TrendFastMA < 1 || TrendSlowMA <= TrendFastMA))
+      return INIT_PARAMETERS_INCORRECT;
    if(StartHour < 0 || StartHour > 23 || EndHour < 1 || EndHour > 24 || StartHour >= EndHour)
       return INIT_PARAMETERS_INCORRECT;
    if(FridayStopHour < 0 || FridayStopHour > 24 || MinMinutesBeforeClose < 0)
@@ -154,6 +163,8 @@ int OnInit()
          " risk=", DoubleToString(RiskPercent, 2),
          "% RR=", DoubleToString(RewardRisk, 2),
          " attempts=", MaxAttempts,
+         " trendFilter=", (UseTrendFilter ? "on" : "off"),
+         " minSlATR=", DoubleToString(MinSlAtrMultiple, 2),
          " maxTrades/day=", MaxTradesPerDay,
          " stopAfterFirstWin=", (StopAfterFirstWin ? "yes" : "no"));
    NoteSkip("init ok");
@@ -619,6 +630,39 @@ bool TrySpikeAt(int s, int &dir, double &spikeBody)
 }
 
 //+------------------------------------------------------------------+
+bool TrendAllows(int dir)
+{
+   if(!UseTrendFilter)
+      return true;
+   if(iBars(Symbol(), TrendTF) < TrendSlowMA + 5)
+      return false;
+
+   double fast = iMA(Symbol(), TrendTF, TrendFastMA, 0, MODE_EMA, PRICE_CLOSE, 1);
+   double slow = iMA(Symbol(), TrendTF, TrendSlowMA, 0, MODE_EMA, PRICE_CLOSE, 1);
+   if(dir > 0)
+      return (fast > slow);
+   return (fast < slow);
+}
+
+//+------------------------------------------------------------------+
+void ApplyAtrSlFloor(int dir, double entry, double &sl)
+{
+   if(MinSlAtrMultiple <= 0.0)
+      return;
+   double atr = iATR(Symbol(), g_tf, AtrPeriod, 1);
+   if(atr <= 0.0)
+      return;
+   double minDist = atr * MinSlAtrMultiple;
+   double curDist = MathAbs(entry - sl);
+   if(curDist >= minDist)
+      return;
+   if(dir > 0)
+      sl = NormPrice(entry - minDist);
+   else
+      sl = NormPrice(entry + minDist);
+}
+
+//+------------------------------------------------------------------+
 bool BuildMicroChannel(int spikeShift, int dir, double spikeBody,
                        int &mcStart, int &mcEnd, double &h1, double &l1)
 {
@@ -653,12 +697,19 @@ bool BuildMicroChannel(int spikeShift, int dir, double spikeBody,
    if(len < MicroMinBars)
       return false;
 
-   // Micro-channel must still be the most recent structure (ends at bar 1)
-   if(mcEnd != 1)
+   // Classic/inside need a live MC ending on bar 1.
+   // H2/H3 need the MC to finish earlier so confirmation bars can form after it.
+   bool confirmMode = (EntryMode == MM_H2_CONFIRM || EntryMode == MM_H3_CONFIRM);
+   if(confirmMode)
+   {
+      if(mcEnd < 2)
+         return false;
+   }
+   else if(mcEnd != 1)
       return false;
 
-   h1 = iHigh(Symbol(), g_tf, 1);
-   l1 = iLow(Symbol(), g_tf, 1);
+   h1 = iHigh(Symbol(), g_tf, mcEnd);
+   l1 = iLow(Symbol(), g_tf, mcEnd);
    for(int i = mcEnd; i <= mcStart; i++)
    {
       if(iHigh(Symbol(), g_tf, i) > h1)
@@ -667,15 +718,15 @@ bool BuildMicroChannel(int spikeShift, int dir, double spikeBody,
          l1 = iLow(Symbol(), g_tf, i);
    }
 
-   // Directional sanity: pullback against spike
+   // Directional sanity: pullback against spike at the MC end
    if(dir > 0)
    {
-      if(iClose(Symbol(), g_tf, 1) >= iClose(Symbol(), g_tf, spikeShift))
+      if(iClose(Symbol(), g_tf, mcEnd) >= iClose(Symbol(), g_tf, spikeShift))
          return false;
    }
    else
    {
-      if(iClose(Symbol(), g_tf, 1) <= iClose(Symbol(), g_tf, spikeShift))
+      if(iClose(Symbol(), g_tf, mcEnd) <= iClose(Symbol(), g_tf, spikeShift))
          return false;
    }
    return true;
@@ -705,55 +756,46 @@ bool ResolveEntryLevels(int dir, int mcStart, int mcEnd, double mcH, double mcL,
 
    if(EntryMode == MM_H2_CONFIRM || EntryMode == MM_H3_CONFIRM)
    {
-      // Build successive extremes from the micro-channel end forward.
-      // H1 = first swing extreme of MC, then look for later highs/lows.
-      int need = (EntryMode == MM_H2_CONFIRM) ? 2 : 3;
-      double levels[];
-      ArrayResize(levels, 0);
-      if(dir > 0)
+      // H1 = last micro-channel extreme. After MC ends, require 1 (H2) or 2 (H3)
+      // newer extremes beyond that level, then enter on the latest one.
+      int needBeyondH1 = (EntryMode == MM_H2_CONFIRM) ? 1 : 2;
+      double h1Level = (dir > 0) ? iHigh(Symbol(), g_tf, mcEnd) : iLow(Symbol(), g_tf, mcEnd);
+      double lastExt = h1Level;
+      double trigger = 0.0;
+      int confirms = 0;
+      for(int s = mcEnd - 1; s >= 1; s--)
       {
-         double last = -1.0;
-         for(int s = mcStart; s >= 1; s--)
+         if(dir > 0)
          {
             double h = iHigh(Symbol(), g_tf, s);
-            if(last < 0.0 || h > last + Point)
+            if(h > lastExt + Point)
             {
-               int n = ArraySize(levels);
-               ArrayResize(levels, n + 1);
-               levels[n] = h;
-               last = h;
+               confirms++;
+               lastExt = h;
+               trigger = h;
             }
          }
-      }
-      else
-      {
-         // Mirror of H1/H2/H3: successive lower lows L1/L2/L3 for sells.
-         double last = 0.0;
-         bool have = false;
-         for(int s = mcStart; s >= 1; s--)
+         else
          {
             double l = iLow(Symbol(), g_tf, s);
-            if(!have || l < last - Point)
+            if(l < lastExt - Point)
             {
-               int n = ArraySize(levels);
-               ArrayResize(levels, n + 1);
-               levels[n] = l;
-               last = l;
-               have = true;
+               confirms++;
+               lastExt = l;
+               trigger = l;
             }
          }
       }
-      if(ArraySize(levels) < need)
+      if(confirms < needBeyondH1 || trigger <= 0.0)
          return false;
-      double lvl = levels[need - 1];
       if(dir > 0)
       {
-         entry = lvl + BufferDist();
+         entry = trigger + BufferDist();
          sl = mcL - BufferDist();
       }
       else
       {
-         entry = lvl - BufferDist();
+         entry = trigger - BufferDist();
          sl = mcH + BufferDist();
       }
       return (MathAbs(entry - sl) > Point);
@@ -798,8 +840,10 @@ void ScanForSetup()
    double mcL = 0.0;
    bool found = false;
    int spikes = 0;
+   int trendBlocks = 0;
+   int levelFails = 0;
 
-   // Prefer the nearest spike that still has a live micro-channel ending on bar 1.
+   // Prefer the nearest spike with a valid micro-channel (and confirmation if needed).
    for(int s = 1 + MicroMinBars; s <= SpikeLookback; s++)
    {
       int d;
@@ -807,10 +851,24 @@ void ScanForSetup()
       if(!TrySpikeAt(s, d, body))
          continue;
       spikes++;
+      if(!TrendAllows(d))
+      {
+         trendBlocks++;
+         continue;
+      }
       int start, end;
       double h, l;
       if(!BuildMicroChannel(s, d, body, start, end, h, l))
          continue;
+
+      double entryTry, slTry;
+      if(!ResolveEntryLevels(d, start, end, h, l, entryTry, slTry))
+      {
+         levelFails++;
+         continue;
+      }
+      ApplyAtrSlFloor(d, entryTry, slTry);
+
       spikeShift = s;
       dir = d;
       spikeBody = body;
@@ -818,6 +876,8 @@ void ScanForSetup()
       mcEnd = end;
       mcH = h;
       mcL = l;
+      g_entryLevel = NormPrice(entryTry);
+      g_slLevel = NormPrice(slTry);
       found = true;
       break;
    }
@@ -826,26 +886,21 @@ void ScanForSetup()
    {
       if(spikes == 0)
          NoteSkip("no spike in lookback");
+      else if(trendBlocks >= spikes)
+         NoteSkip("spikes blocked by H1 trend filter");
+      else if(levelFails > 0)
+         NoteSkip("MC found but entry confirmation/levels failed");
       else
-         NoteSkip("spike found but no valid micro-channel to bar1");
+         NoteSkip("spike found but no valid micro-channel");
       return;
    }
    g_mcHits++;
-
-   double entry, sl;
-   if(!ResolveEntryLevels(dir, mcStart, mcEnd, mcH, mcL, entry, sl))
-   {
-      NoteSkip("entry levels not resolved for mode");
-      return;
-   }
 
    g_signals++;
    GlobalVariableSet(Prefix() + "SIG", (double)g_signals);
    g_dir = dir;
    g_attempt = 1;
    g_setupBar = iTime(Symbol(), g_tf, 1);
-   g_entryLevel = NormPrice(entry);
-   g_slLevel = NormPrice(sl);
 
    Print("MicroMAP setup #", g_signals,
          dir > 0 ? " BUY" : " SELL",
