@@ -12,10 +12,10 @@
 //+------------------------------------------------------------------+
 #property copyright "MicroMAP EA"
 #property link      "https://poursamadi.com/micromap/"
-#property version   "1.02"
+#property version   "1.03"
 #property strict
 #property description "Spike + micro-channel entries with up to 3 attempts."
-#property description "One position. Max 3 opens/day. Stop after first daily win."
+#property description "Chart TF + live chart spread. Max 3 opens/day. Stop after first win."
 
 enum ENUM_MM_ENTRY_MODE
 {
@@ -32,8 +32,6 @@ input bool               StopAfterFirstWin     = true;  // no more entries after
 input double             RewardRisk            = 2.0;   // TP distance / SL distance (page: min ~2)
 input ENUM_MM_ENTRY_MODE EntryMode             = MM_CLASSIC_CHAIN;
 input int                MaxAttempts           = 3;     // invalidate setup after this many stops
-input bool               UseChartTimeframe     = true;  // if true, ignore SignalTF and use the chart TF
-input ENUM_TIMEFRAMES    SignalTF              = PERIOD_M5;
 input int                SpikeLookback         = 40;
 input int                AtrPeriod             = 14;
 input double             SpikeBodyAtrMin       = 1.0;   // spike body >= ATR * this
@@ -43,7 +41,7 @@ input int                MicroMinBars          = 2;
 input int                MicroMaxBars          = 12;
 input double             MicroMaxBodyVsSpike   = 0.85;  // each MC body <= spike body * this
 input double             BreakBufferPoints     = 2.0;   // stop-order offset beyond H/L
-input double             MinSlSpreadMultiple   = 1.2;   // gold/indices need looser than FX
+input double             MinSlSpreadMultiple   = 1.2;   // min SL distance vs live chart spread
 input int                StartHour             = 0;     // 0-24 broker server time; 0/24 = almost full day
 input int                EndHour               = 24;
 input int                FridayStopHour        = 22;
@@ -51,7 +49,6 @@ input int                MinMinutesBeforeClose = 0;
 input bool               CloseAtSessionEnd     = false;
 input bool               FlatBeforeWeekend     = true;
 input bool               TradeOnSunday         = false;
-input int                MaxSpreadPoints       = 800;   // XAU/US30 spreads are often hundreds of points
 input int                SlippagePoints        = 80;
 input bool               CancelPendingOnBreak  = true;  // cancel if structure invalidates
 input bool               DrawMarkers           = true;
@@ -98,7 +95,24 @@ void NoteSkip(string reason)
 //+------------------------------------------------------------------+
 void RefreshTF()
 {
-   g_tf = UseChartTimeframe ? (ENUM_TIMEFRAMES)Period() : SignalTF;
+   // Always follow the chart the EA is attached to.
+   g_tf = (ENUM_TIMEFRAMES)Period();
+}
+
+//+------------------------------------------------------------------+
+int ChartSpreadPoints()
+{
+   RefreshRates();
+   if(Point > 0.0 && Ask > 0.0 && Bid > 0.0 && Ask >= Bid)
+   {
+      int fromQuotes = (int)MathRound((Ask - Bid) / Point);
+      if(fromQuotes >= 0)
+         return fromQuotes;
+   }
+   int fromSymbol = (int)MarketInfo(Symbol(), MODE_SPREAD);
+   if(fromSymbol < 0)
+      return 0;
+   return fromSymbol;
 }
 
 //+------------------------------------------------------------------+
@@ -120,7 +134,7 @@ int OnInit()
       return INIT_PARAMETERS_INCORRECT;
    if(FridayStopHour < 0 || FridayStopHour > 24 || MinMinutesBeforeClose < 0)
       return INIT_PARAMETERS_INCORRECT;
-   if(MaxSpreadPoints < 0 || SlippagePoints < 0)
+   if(SlippagePoints < 0)
       return INIT_PARAMETERS_INCORRECT;
 
    RefreshTF();
@@ -130,23 +144,18 @@ int OnInit()
 
    LoadState();
 
-   int curSpread = (int)MarketInfo(Symbol(), MODE_SPREAD);
+   int curSpread = ChartSpreadPoints();
    Print("MicroMAP started. symbol=", Symbol(),
          " digits=", Digits,
          " point=", DoubleToString(Point, Digits),
-         " spread=", curSpread,
-         " maxSpread=", MaxSpreadPoints,
-         " tf=", (int)g_tf,
+         " chartSpread=", curSpread,
+         " chartTF=", (int)g_tf,
          " mode=", (int)EntryMode,
          " risk=", DoubleToString(RiskPercent, 2),
          "% RR=", DoubleToString(RewardRisk, 2),
          " attempts=", MaxAttempts,
          " maxTrades/day=", MaxTradesPerDay,
          " stopAfterFirstWin=", (StopAfterFirstWin ? "yes" : "no"));
-   if(curSpread > MaxSpreadPoints)
-      Print("MicroMAP warning: current spread ", curSpread,
-            " is already above MaxSpreadPoints=", MaxSpreadPoints,
-            ". Raise MaxSpreadPoints for XAU/US30.");
    NoteSkip("init ok");
    return INIT_SUCCEEDED;
 }
@@ -946,13 +955,7 @@ bool PlacePending(int dir, double entry, double sl, int attempt)
       return false;
    }
 
-   int spread = (int)MarketInfo(Symbol(), MODE_SPREAD);
-   if(spread > MaxSpreadPoints)
-   {
-      NoteSkip("spread " + IntegerToString(spread) + " > max " + IntegerToString(MaxSpreadPoints));
-      Print("MicroMAP skipped: spread ", spread, " > ", MaxSpreadPoints);
-      return false;
-   }
+   int spread = ChartSpreadPoints();
 
    double slDist = MathAbs(entry - sl);
    double minDist = MathMax(MarketInfo(Symbol(), MODE_STOPLEVEL) * Point,
@@ -1349,11 +1352,10 @@ string StatusText()
 //+------------------------------------------------------------------+
 void Panel()
 {
-   int spread = (int)MarketInfo(Symbol(), MODE_SPREAD);
+   int spread = ChartSpreadPoints();
    Comment("MicroMAP  ", StatusText(),
-           "\nTF=", IntegerToString((int)g_tf),
-           "  spread=", IntegerToString(spread),
-           " / max=", IntegerToString(MaxSpreadPoints),
+           "\nChart TF=", IntegerToString((int)g_tf),
+           "  chart spread=", IntegerToString(spread), " pt",
            "\nLast skip: ", g_lastSkip,
            "\nScanned bars: ", IntegerToString(g_scanBars),
            "  spike hits: ", IntegerToString(g_spikeHits),
