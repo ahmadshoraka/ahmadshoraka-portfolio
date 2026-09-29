@@ -12,10 +12,10 @@
 //+------------------------------------------------------------------+
 #property copyright "MicroMAP EA"
 #property link      "https://poursamadi.com/micromap/"
-#property version   "1.05"
+#property version   "1.06"
 #property strict
 #property description "Optional close-confirm entry and BE at +1R (inputs, default off)."
-#property description "Defaults match v1.04 stable behavior for A/B testing."
+#property description "v1.06: setup quality filters (trend price, break momentum, spike age, max SL)."
 
 enum ENUM_MM_ENTRY_MODE
 {
@@ -50,8 +50,12 @@ input bool               UseTrendFilter           = true;  // only trade with hi
 input ENUM_TIMEFRAMES    TrendTF                  = PERIOD_H1;
 input int                TrendFastMA              = 34;
 input int                TrendSlowMA              = 89;
-input int                StartHour                = 0;     // 0-24 broker server time; 0/24 = almost full day
-input int                EndHour                  = 24;
+input bool               RequireTrendPriceAlign   = true;  // H1 close on correct side of slow EMA
+input double             MinBreakBodyAtr          = 0.35;  // bar1 body with trend >= ATR*this; 0=off
+input int                MaxSpikeAgeBars          = 24;    // reject stale spikes; 0=off
+input double             MaxSlAtrMultiple         = 2.5;   // reject very wide SL vs ATR; 0=off
+input int                StartHour                = 8;     // profit preset: London/NY overlap (broker time)
+input int                EndHour                  = 20;
 input int                FridayStopHour           = 22;
 input int                MinMinutesBeforeClose    = 0;
 input bool               CloseAtSessionEnd        = false;
@@ -150,6 +154,8 @@ int OnInit()
       return INIT_PARAMETERS_INCORRECT;
    if(UseTrendFilter && (TrendFastMA < 1 || TrendSlowMA <= TrendFastMA))
       return INIT_PARAMETERS_INCORRECT;
+   if(MinBreakBodyAtr < 0.0 || MaxSpikeAgeBars < 0 || MaxSlAtrMultiple < 0.0)
+      return INIT_PARAMETERS_INCORRECT;
    if(StartHour < 0 || StartHour > 23 || EndHour < 1 || EndHour > 24 || StartHour >= EndHour)
       return INIT_PARAMETERS_INCORRECT;
    if(FridayStopHour < 0 || FridayStopHour > 24 || MinMinutesBeforeClose < 0)
@@ -178,6 +184,11 @@ int OnInit()
          " minSlATR=", DoubleToString(MinSlAtrMultiple, 2),
          " closeConfirm=", (RequireBreakCloseConfirm ? "on" : "off"),
          " BE@1R=", (MoveSlToBreakevenAt1R ? "on" : "off"),
+         " trendPriceAlign=", (RequireTrendPriceAlign ? "on" : "off"),
+         " minBreakBodyATR=", DoubleToString(MinBreakBodyAtr, 2),
+         " maxSpikeAge=", MaxSpikeAgeBars,
+         " maxSlATR=", DoubleToString(MaxSlAtrMultiple, 2),
+         " session=", IntegerToString(StartHour), "-", IntegerToString(EndHour),
          " maxTrades/day=", MaxTradesPerDay,
          " stopAfterFirstWin=", (StopAfterFirstWin ? "yes" : "no"));
    NoteSkip("init ok");
@@ -218,6 +229,8 @@ void OnTick()
       NoteSkip("flat session / weekend rule");
       CancelOurPending();
       CloseOurPositions();
+      if(g_state == ST_WAIT_CLOSE || g_state == ST_PENDING || g_state == ST_WAIT_RETRY)
+         ResetSetup(false);
       Panel();
       return;
    }
@@ -672,6 +685,68 @@ bool TrendAllows(int dir)
 }
 
 //+------------------------------------------------------------------+
+bool PriceAlignsWithTrend(int dir)
+{
+   if(!RequireTrendPriceAlign || !UseTrendFilter)
+      return true;
+   if(iBars(Symbol(), TrendTF) < TrendSlowMA + 5)
+      return false;
+   double slow = iMA(Symbol(), TrendTF, TrendSlowMA, 0, MODE_EMA, PRICE_CLOSE, 1);
+   double px = iClose(Symbol(), TrendTF, 1);
+   if(dir > 0)
+      return (px > slow);
+   return (px < slow);
+}
+
+//+------------------------------------------------------------------+
+bool SetupPassesQuality(int dir, int spikeShift, double entry, double sl, string &reason)
+{
+   reason = "";
+   if(MaxSpikeAgeBars > 0 && spikeShift > MaxSpikeAgeBars)
+   {
+      reason = "spike too old";
+      return false;
+   }
+   if(!PriceAlignsWithTrend(dir))
+   {
+      reason = "H1 price vs slow EMA";
+      return false;
+   }
+   if(MinBreakBodyAtr > 0.0)
+   {
+      double atr = iATR(Symbol(), g_tf, AtrPeriod, 1);
+      double o1 = iOpen(Symbol(), g_tf, 1);
+      double c1 = iClose(Symbol(), g_tf, 1);
+      double body = MathAbs(c1 - o1);
+      if(atr <= 0.0 || body < atr * MinBreakBodyAtr)
+      {
+         reason = "weak break bar body";
+         return false;
+      }
+      if(dir > 0 && c1 <= o1)
+      {
+         reason = "break bar not bullish";
+         return false;
+      }
+      if(dir < 0 && c1 >= o1)
+      {
+         reason = "break bar not bearish";
+         return false;
+      }
+   }
+   if(MaxSlAtrMultiple > 0.0)
+   {
+      double atr = iATR(Symbol(), g_tf, AtrPeriod, 1);
+      if(atr > 0.0 && MathAbs(entry - sl) > atr * MaxSlAtrMultiple)
+      {
+         reason = "SL too wide vs ATR";
+         return false;
+      }
+   }
+   return true;
+}
+
+//+------------------------------------------------------------------+
 void ApplyAtrSlFloor(int dir, double entry, double &sl)
 {
    if(MinSlAtrMultiple <= 0.0)
@@ -872,6 +947,8 @@ void ScanForSetup()
    int spikes = 0;
    int trendBlocks = 0;
    int levelFails = 0;
+   int qualityBlocks = 0;
+   string qualityReason = "";
 
    // Prefer the nearest spike with a valid micro-channel (and confirmation if needed).
    for(int s = 1 + MicroMinBars; s <= SpikeLookback; s++)
@@ -899,6 +976,14 @@ void ScanForSetup()
       }
       ApplyAtrSlFloor(d, entryTry, slTry);
 
+      string qReason = "";
+      if(!SetupPassesQuality(d, s, entryTry, slTry, qReason))
+      {
+         qualityBlocks++;
+         qualityReason = qReason;
+         continue;
+      }
+
       spikeShift = s;
       dir = d;
       spikeBody = body;
@@ -920,6 +1005,8 @@ void ScanForSetup()
          NoteSkip("spikes blocked by H1 trend filter");
       else if(levelFails > 0)
          NoteSkip("MC found but entry confirmation/levels failed");
+      else if(qualityBlocks > 0)
+         NoteSkip("quality filter: " + qualityReason);
       else
          NoteSkip("spike found but no valid micro-channel");
       return;
@@ -1460,6 +1547,7 @@ void ManageOpenTrade()
             g_tradeTicket = OrderTicket();
             g_dir = (OrderType() == OP_BUY) ? 1 : -1;
             g_state = ST_IN_TRADE;
+            CaptureOpenedTradeRisk();
             SaveState();
             break;
          }
@@ -1545,6 +1633,13 @@ void InvalidateSetup()
    g_attempt = 0;
    g_pendingTicket = -1;
    g_tradeTicket = -1;
+   g_entryLevel = 0.0;
+   g_slLevel = 0.0;
+   g_breakLevel = 0.0;
+   g_tpLevel = 0.0;
+   g_riskDist = 0.0;
+   g_beMoved = false;
+   g_confirmBarsLeft = 0;
    SaveState();
 }
 
@@ -1715,6 +1810,10 @@ void Panel()
            "  chart spread=", IntegerToString(spread), " pt",
            "\nCloseConfirm=", (RequireBreakCloseConfirm ? "ON" : "off"),
            "  BE@1R=", (MoveSlToBreakevenAt1R ? "ON" : "off"),
+           "  quality: align=", (RequireTrendPriceAlign ? "on" : "off"),
+           " breakATR=", DoubleToString(MinBreakBodyAtr, 2),
+           " spikeAge=", MaxSpikeAgeBars,
+           " maxSlATR=", DoubleToString(MaxSlAtrMultiple, 2),
            "  BE moved=", (g_beMoved ? "yes" : "no"),
            "\nLast skip: ", g_lastSkip,
            "\nScanned bars: ", IntegerToString(g_scanBars),
