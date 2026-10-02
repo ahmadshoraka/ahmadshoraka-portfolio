@@ -46,6 +46,39 @@ npx wrangler login
 npm run deploy:cf
 ```
 
+## Visitor analytics (Cloudflare Web Analytics)
+
+Privacy-friendly page views and visitors — no Google Analytics required.
+
+### Recommended: one-click on Cloudflare Pages
+
+1. Open [Cloudflare Dashboard](https://dash.cloudflare.com) → **Workers & Pages**
+2. Select the `ahmadshoraka-portfolio` project
+3. Go to **Metrics**
+4. Under **Web Analytics**, click **Enable**
+5. Trigger a new deployment (push to `main`, or **Retry deployment** in Pages)
+
+Cloudflare injects the analytics beacon automatically on the next deploy. Your `index.html` is already valid HTML, which is required for that injection.
+
+Then open **Web Analytics** in the Cloudflare dashboard to see:
+
+- Unique visitors and page views
+- Top pages and referrers
+- Countries / browsers / devices
+- Core Web Vitals
+
+SPA route changes (`/en` → `/fa/demo/admin`, etc.) are tracked automatically.
+
+### Optional: manual JS beacon
+
+If you prefer embedding the script yourself (or the site is not using Pages auto-inject):
+
+1. In Cloudflare → **Web Analytics** → your site → copy the **JavaScript snippet** token
+2. Put the token in `src/environments/environment.prod.ts` as `cloudflareWebAnalyticsToken`
+3. Redeploy
+
+Leave the token empty when using the one-click Pages setup above (avoids loading the beacon twice).
+
 ## Add your photo
 
 Save a professional headshot as:
