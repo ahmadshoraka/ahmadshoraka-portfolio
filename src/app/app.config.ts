@@ -13,6 +13,7 @@ import { provideTranslateService } from '@ngx-translate/core';
 import { provideTranslateHttpLoader } from '@ngx-translate/http-loader';
 
 import { routes } from './app.routes';
+import { installCloudflareWebAnalytics } from './core/analytics/cloudflare-web-analytics';
 import { AppDirectionality } from './core/i18n/app-directionality';
 import { LocaleService } from './core/i18n/locale.service';
 import { detectPreferredLang } from './core/i18n/locales';
@@ -20,6 +21,7 @@ import {
   APP_DATE_FORMATS,
   MultiCalendarDateAdapter,
 } from './core/i18n/multi-calendar-date-adapter';
+import { environment } from '../environments/environment';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -48,6 +50,7 @@ export const appConfig: ApplicationConfig = {
     { provide: MAT_DATE_FORMATS, useValue: APP_DATE_FORMATS },
     provideAppInitializer(() => {
       inject(LocaleService).init();
+      installCloudflareWebAnalytics(environment.cloudflareWebAnalyticsToken);
     }),
   ],
 };
