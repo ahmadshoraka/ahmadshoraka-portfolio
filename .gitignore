@@ -10,6 +10,9 @@
 /node_modules
 npm-debug.log
 yarn-error.log
+vorood/node_modules
+vorood/.next
+vorood/out
 
 # IDEs and editors
 .idea/
