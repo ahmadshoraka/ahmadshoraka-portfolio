@@ -7,9 +7,9 @@ import { useVorood } from "@/components/vorood-provider";
 import type { ActivityLevel, Sex, UserLevel } from "@/lib/types";
 
 const LEVELS: { id: UserLevel; label: string; hint: string }[] = [
-  { id: "beginner", label: "مبتدی", hint: "فقط کالری روزانه" },
-  { id: "intermediate", label: "متوسط", hint: "کالری + ماکرو" },
-  { id: "pro", label: "حرفه‌ای", hint: "کنترل دقیق‌تر" },
+  { id: "beginner", label: "مبتدی", hint: "فقط کالری روزانه، ساده و شفاف" },
+  { id: "intermediate", label: "متوسط", hint: "کالری + پروتئین/کرب/چربی" },
+  { id: "pro", label: "حرفه‌ای", hint: "جزئیات بیشتر برای کنترل دقیق" },
 ];
 
 const ACTIVITY: { id: ActivityLevel; label: string }[] = [
@@ -23,6 +23,7 @@ const ACTIVITY: { id: ActivityLevel; label: string }[] = [
 export default function OnboardingPage() {
   const { completeOnboarding } = useVorood();
   const router = useRouter();
+  const [step, setStep] = useState(0);
 
   const [name, setName] = useState("");
   const [sex, setSex] = useState<Sex>("female");
@@ -46,8 +47,7 @@ export default function OnboardingPage() {
     [sex, age, heightCm, weightKg, targetWeightKg, activity],
   );
 
-  function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  function finish() {
     completeOnboarding({
       name: name.trim() || "کاربر",
       sex,
@@ -68,10 +68,23 @@ export default function OnboardingPage() {
         <p className="topbar-title">ساخت پروفایل</p>
       </header>
 
-      <form className="stack-gap" onSubmit={onSubmit}>
-        <div className="panel">
-          <h2>اطلاعات پایه</h2>
-          <p className="muted">برای محاسبه کالری هدف روزانه — فقط تغذیه.</p>
+      <div className="stepper" aria-label="پیشرفت ساخت پروفایل">
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
+            className={
+              i === step ? "step-dot active" : i < step ? "step-dot done" : "step-dot"
+            }
+          />
+        ))}
+      </div>
+
+      {step === 0 ? (
+        <section className="panel stack-gap">
+          <div>
+            <h2>از کجا شروع کنیم؟</h2>
+            <p className="muted">چند اطلاعات ساده برای محاسبه کالری روزانه.</p>
+          </div>
           <div className="field">
             <label htmlFor="name">نام</label>
             <input
@@ -79,6 +92,7 @@ export default function OnboardingPage() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="مثلاً سارا"
+              autoComplete="nickname"
             />
           </div>
           <div className="field">
@@ -101,54 +115,70 @@ export default function OnboardingPage() {
               ))}
             </div>
           </div>
-          <div className="field">
-            <label htmlFor="age">سن</label>
-            <input
-              id="age"
-              type="number"
-              min={14}
-              max={90}
-              value={age}
-              onChange={(e) => setAge(Number(e.target.value))}
-            />
+          <div className="row-2">
+            <div className="field">
+              <label htmlFor="age">سن</label>
+              <input
+                id="age"
+                type="number"
+                min={14}
+                max={90}
+                value={age}
+                onChange={(e) => setAge(Number(e.target.value))}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="height">قد (سانتی‌متر)</label>
+              <input
+                id="height"
+                type="number"
+                min={120}
+                max={230}
+                value={heightCm}
+                onChange={(e) => setHeightCm(Number(e.target.value))}
+              />
+            </div>
+          </div>
+          <button type="button" className="btn btn-primary btn-block" onClick={() => setStep(1)}>
+            ادامه
+          </button>
+        </section>
+      ) : null}
+
+      {step === 1 ? (
+        <section className="panel stack-gap">
+          <div>
+            <h2>وزن و هدف</h2>
+            <p className="muted">سطح فعالیت فقط برای محاسبه کالری است؛ بخش ورزش نداریم.</p>
+          </div>
+          <div className="row-2">
+            <div className="field">
+              <label htmlFor="weight">وزن فعلی</label>
+              <input
+                id="weight"
+                type="number"
+                min={35}
+                max={250}
+                step={0.1}
+                value={weightKg}
+                onChange={(e) => setWeightKg(Number(e.target.value))}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="target">وزن هدف</label>
+              <input
+                id="target"
+                type="number"
+                min={35}
+                max={250}
+                step={0.1}
+                value={targetWeightKg}
+                onChange={(e) => setTargetWeightKg(Number(e.target.value))}
+              />
+            </div>
           </div>
           <div className="field">
-            <label htmlFor="height">قد (سانتی‌متر)</label>
-            <input
-              id="height"
-              type="number"
-              min={120}
-              max={230}
-              value={heightCm}
-              onChange={(e) => setHeightCm(Number(e.target.value))}
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="weight">وزن فعلی (کیلو)</label>
-            <input
-              id="weight"
-              type="number"
-              min={35}
-              max={250}
-              step={0.1}
-              value={weightKg}
-              onChange={(e) => setWeightKg(Number(e.target.value))}
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="target">وزن هدف (کیلو)</label>
-            <input
-              id="target"
-              type="number"
-              min={35}
-              max={250}
-              step={0.1}
-              value={targetWeightKg}
-              onChange={(e) => setTargetWeightKg(Number(e.target.value))}
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="activity">سطح فعالیت (فقط برای محاسبه کالری)</label>
+            <label htmlFor="activity">سطح فعالیت روزانه</label>
             <select
               id="activity"
               value={activity}
@@ -161,10 +191,23 @@ export default function OnboardingPage() {
               ))}
             </select>
           </div>
-        </div>
+          <div className="stack-gap">
+            <button type="button" className="btn btn-primary btn-block" onClick={() => setStep(2)}>
+              ادامه
+            </button>
+            <button type="button" className="btn btn-ghost btn-block" onClick={() => setStep(0)}>
+              قبلی
+            </button>
+          </div>
+        </section>
+      ) : null}
 
-        <div className="panel">
-          <h2>سطح کاربری</h2>
+      {step === 2 ? (
+        <section className="panel stack-gap">
+          <div>
+            <h2>سطح و هدف کالری</h2>
+            <p className="muted">سطح را هر وقت خواستی می‌توانی جدی‌تر کنی.</p>
+          </div>
           <div className="chip-row">
             {LEVELS.map((l) => (
               <button
@@ -177,33 +220,34 @@ export default function OnboardingPage() {
               </button>
             ))}
           </div>
-          <p className="muted" style={{ marginTop: "0.7rem" }}>
-            {LEVELS.find((l) => l.id === level)?.hint}
-          </p>
-        </div>
+          <p className="muted">{LEVELS.find((l) => l.id === level)?.hint}</p>
 
-        <div className="panel">
-          <h2>هدف کالری پیشنهادی</h2>
-          <p className="muted">
-            حدود{" "}
-            <strong style={{ color: "var(--leaf-deep)" }}>
-              {formatNumberFa(preview.dailyCalorieTarget)}
-            </strong>{" "}
-            کالری در روز
-          </p>
-          {level !== "beginner" ? (
-            <p className="muted">
-              پروتئین {formatNumberFa(preview.proteinTargetG)}g · کرب{" "}
-              {formatNumberFa(preview.carbTargetG)}g · چربی{" "}
-              {formatNumberFa(preview.fatTargetG)}g
+          <div className="panel" style={{ boxShadow: "none", marginTop: "0.25rem" }}>
+            <p className="muted" style={{ marginTop: 0 }}>
+              هدف پیشنهادی امروز
             </p>
-          ) : null}
-        </div>
+            <div className="preview-pill">
+              {formatNumberFa(preview.dailyCalorieTarget)} کالری
+            </div>
+            {level !== "beginner" ? (
+              <p className="muted" style={{ marginTop: "0.65rem", marginBottom: 0 }}>
+                پروتئین {formatNumberFa(preview.proteinTargetG)}g · کرب{" "}
+                {formatNumberFa(preview.carbTargetG)}g · چربی{" "}
+                {formatNumberFa(preview.fatTargetG)}g
+              </p>
+            ) : null}
+          </div>
 
-        <button type="submit" className="btn btn-primary">
-          برو به امروز
-        </button>
-      </form>
+          <div className="stack-gap">
+            <button type="button" className="btn btn-primary btn-block" onClick={finish}>
+              برو به امروز
+            </button>
+            <button type="button" className="btn btn-ghost btn-block" onClick={() => setStep(1)}>
+              قبلی
+            </button>
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

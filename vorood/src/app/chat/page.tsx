@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { useVorood } from "@/components/vorood-provider";
 
@@ -17,10 +17,17 @@ export default function ChatPage() {
   } = useVorood();
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (ready && !profile) router.replace("/onboarding");
   }, [ready, profile, router]);
+
+  useEffect(() => {
+    const el = logRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [chat, loading]);
 
   async function send(text: string) {
     if (!profile || !text.trim() || loading) return;
@@ -60,16 +67,16 @@ export default function ChatPage() {
   }
 
   if (!ready || !profile) {
-    return <div className="hero-landing muted">در حال بارگذاری…</div>;
+    return <div className="loading-screen">در حال آماده‌سازی دستیار…</div>;
   }
 
   return (
     <AppShell title="دستیار تغذیه">
-      <section className="panel">
-        <p className="muted" style={{ marginTop: 0 }}>
+      <section className="panel stack-gap">
+        <p className="muted" style={{ margin: 0 }}>
           فقط درباره ورودی غذا و کالری حرف می‌زنیم — جایگزین پزشک نیست.
         </p>
-        <div className="chat-log" aria-live="polite">
+        <div className="chat-log" aria-live="polite" ref={logRef}>
           {chat.length === 0 ? (
             <div className="bubble assistant">
               سلام {profile.name}. بپرس مثلاً: «شام با کالری مانده چی بخورم؟»
@@ -84,9 +91,15 @@ export default function ChatPage() {
           {loading ? <div className="bubble assistant muted">در حال فکر…</div> : null}
         </div>
 
-        <div className="chip-row" style={{ margin: "0.75rem 0" }}>
+        <div className="chip-row">
           {["شام چی بخورم؟", "هدف کالری‌ام چقدر است؟", "پروتئین چی؟"].map((q) => (
-            <button key={q} type="button" className="chip" onClick={() => void send(q)}>
+            <button
+              key={q}
+              type="button"
+              className="chip"
+              disabled={loading}
+              onClick={() => void send(q)}
+            >
               {q}
             </button>
           ))}
@@ -108,7 +121,7 @@ export default function ChatPage() {
               placeholder="درباره وعده، کالری مانده، یا جایگزینی غذا بپرس"
             />
           </div>
-          <button type="submit" className="btn btn-primary" disabled={loading}>
+          <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
             ارسال
           </button>
         </form>

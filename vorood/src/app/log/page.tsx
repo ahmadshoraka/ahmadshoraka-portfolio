@@ -73,15 +73,18 @@ export default function LogPage() {
   }, [tab, profile]);
 
   if (!ready || !profile) {
-    return <div className="hero-landing muted">در حال بارگذاری…</div>;
+    return <div className="loading-screen">در حال آماده‌سازی ثبت غذا…</div>;
   }
+
+  const overBudget = remainingCalories < 0;
 
   return (
     <AppShell title="ثبت غذا">
       <section className="panel">
-        <p className="muted" style={{ marginTop: 0 }}>
-          مانده امروز:{" "}
-          <strong>{formatNumberFa(Math.max(0, remainingCalories))}</strong> کالری
+        <p className={overBudget ? "budget-note warn" : "muted"} style={{ marginTop: 0 }}>
+          {overBudget
+            ? `${formatNumberFa(Math.abs(remainingCalories))} کالری بیش از هدف`
+            : `مانده امروز: ${formatNumberFa(remainingCalories)} کالری`}
         </p>
         <div className="tabs" role="tablist">
           {(
@@ -115,34 +118,41 @@ export default function LogPage() {
               />
             </div>
             <div className="list">
-              {(query ? foods : FOOD_CATALOG).map((f) => (
-                <div key={f.id} className="list-item">
-                  <div>
-                    <div style={{ fontWeight: 700 }}>{f.nameFa}</div>
-                    <div className="muted">
-                      {formatNumberFa(f.calories)} کالری · {f.servingLabel}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn-ghost"
-                    style={{ padding: "0.45rem 0.8rem" }}
-                    onClick={() => {
-                      addEntry({
-                        name: f.nameFa,
-                        calories: f.calories,
-                        proteinG: f.proteinG,
-                        carbG: f.carbG,
-                        fatG: f.fatG,
-                        source: "catalog",
-                      });
-                      router.push("/today");
-                    }}
-                  >
-                    افزودن
-                  </button>
+              {(query ? foods : FOOD_CATALOG).length === 0 ? (
+                <div className="empty-state">
+                  <div className="empty-orb" aria-hidden />
+                  <h3>چیزی پیدا نشد</h3>
+                  <p className="muted">عبارت دیگری امتحان کن یا از ثبت دستی استفاده کن.</p>
                 </div>
-              ))}
+              ) : (
+                (query ? foods : FOOD_CATALOG).map((f) => (
+                  <div key={f.id} className="list-item">
+                    <div>
+                      <div className="item-title">{f.nameFa}</div>
+                      <div className="muted">
+                        {formatNumberFa(f.calories)} کالری · {f.servingLabel}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => {
+                        addEntry({
+                          name: f.nameFa,
+                          calories: f.calories,
+                          proteinG: f.proteinG,
+                          carbG: f.carbG,
+                          fatG: f.fatG,
+                          source: "catalog",
+                        });
+                        router.push("/today");
+                      }}
+                    >
+                      افزودن
+                    </button>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         ) : null}
@@ -219,7 +229,7 @@ export default function LogPage() {
                 </div>
               </>
             ) : null}
-            <button type="submit" className="btn btn-primary">
+            <button type="submit" className="btn btn-primary btn-block">
               ثبت دستی
             </button>
           </form>
@@ -232,44 +242,51 @@ export default function LogPage() {
             </p>
             <button
               type="button"
-              className="btn btn-ghost"
+              className="btn btn-ghost btn-block"
               onClick={() => void loadAiSuggestions()}
               disabled={aiLoading}
             >
               {aiLoading ? "در حال پیشنهاد…" : "تازه‌سازی پیشنهادها"}
             </button>
-            {error ? <p className="danger-text">{error}</p> : null}
+            {error ? <p className="budget-note warn">{error}</p> : null}
             {aiSummary ? <p className="muted">{aiSummary}</p> : null}
             <div className="list">
-              {aiItems.map((s) => (
-                <div key={s.id} className="list-item">
-                  <div>
-                    <div style={{ fontWeight: 700 }}>{s.name}</div>
-                    <div className="muted">
-                      {formatNumberFa(s.calories)} کالری · {s.servingLabel}
-                    </div>
-                    <div className="muted">{s.reason}</div>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn-ghost"
-                    style={{ padding: "0.45rem 0.8rem" }}
-                    onClick={() => {
-                      addEntry({
-                        name: s.name,
-                        calories: s.calories,
-                        proteinG: s.proteinG,
-                        carbG: s.carbG,
-                        fatG: s.fatG,
-                        source: "ai",
-                      });
-                      router.push("/today");
-                    }}
-                  >
-                    افزودن
-                  </button>
+              {aiItems.length === 0 && !aiLoading ? (
+                <div className="empty-state">
+                  <div className="empty-orb" aria-hidden />
+                  <h3>پیشنهادی آماده نیست</h3>
+                  <p className="muted">تازه‌سازی را بزن یا از کاتالوگ انتخاب کن.</p>
                 </div>
-              ))}
+              ) : (
+                aiItems.map((s) => (
+                  <div key={s.id} className="list-item">
+                    <div>
+                      <div className="item-title">{s.name}</div>
+                      <div className="muted">
+                        {formatNumberFa(s.calories)} کالری · {s.servingLabel}
+                      </div>
+                      <div className="muted">{s.reason}</div>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => {
+                        addEntry({
+                          name: s.name,
+                          calories: s.calories,
+                          proteinG: s.proteinG,
+                          carbG: s.carbG,
+                          fatG: s.fatG,
+                          source: "ai",
+                        });
+                        router.push("/today");
+                      }}
+                    >
+                      افزودن
+                    </button>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         ) : null}

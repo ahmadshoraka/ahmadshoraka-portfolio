@@ -17,15 +17,21 @@ page.on("console", (msg) => {
   if (msg.type() === "error") errors.push(msg.text());
 });
 
+const nav = () => page.locator("nav.bottom-nav");
+
 await page.goto("http://127.0.0.1:3000/", { waitUntil: "networkidle" });
+await page.evaluate(() => localStorage.clear());
+await page.reload({ waitUntil: "networkidle" });
 await page.getByRole("link", { name: "شروع کن" }).click();
 await page.waitForURL("**/onboarding");
-await page.getByLabel("نام").fill("آزما");
+await page.getByRole("textbox", { name: "نام" }).fill("آزما");
+await page.getByRole("button", { name: "ادامه" }).click();
+await page.getByRole("button", { name: "ادامه" }).click();
 await page.getByRole("button", { name: "برو به امروز" }).click();
 await page.waitForURL("**/today");
 await page.screenshot({ path: path.join(outDir, "vorood-e2e-today.png"), fullPage: true });
 
-await page.getByRole("link", { name: "ثبت غذا" }).click();
+await nav().getByRole("link", { name: "ثبت غذا" }).click();
 await page.waitForURL("**/log");
 const eggRow = page.locator(".list-item").filter({ hasText: "تخم‌مرغ" });
 await eggRow.getByRole("button", { name: "افزودن" }).click();
@@ -33,14 +39,15 @@ await page.waitForURL("**/today");
 const eatenText = await page.locator(".stat").nth(1).innerText();
 await page.screenshot({ path: path.join(outDir, "vorood-e2e-after-add.png"), fullPage: true });
 
-await page.getByRole("link", { name: "ثبت غذا" }).click();
+await nav().getByRole("link", { name: "ثبت غذا" }).click();
+await page.waitForURL("**/log");
 await page.getByRole("tab", { name: "پیشنهاد AI" }).click();
 await page.getByText("تازه‌سازی پیشنهادها").waitFor({ timeout: 10000 });
 await page.locator(".list-item").first().waitFor({ timeout: 10000 });
 await page.screenshot({ path: path.join(outDir, "vorood-e2e-ai.png"), fullPage: true });
 const aiOk = (await page.locator(".list-item").count()) > 0;
 
-await page.getByRole("link", { name: "دستیار" }).click();
+await nav().getByRole("link", { name: "دستیار" }).click();
 await page.waitForURL("**/chat");
 await page.getByRole("button", { name: "شام چی بخورم؟" }).click();
 await page.locator(".bubble.user").filter({ hasText: "شام چی بخورم؟" }).waitFor({ timeout: 5000 });
