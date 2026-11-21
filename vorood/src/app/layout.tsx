@@ -1,12 +1,13 @@
 import type { Metadata, Viewport } from "next";
-import { Vazirmatn } from "next/font/google";
+import localFont from "next/font/local";
 import { VoroodProvider } from "@/components/vorood-provider";
 import "./globals.css";
 
-const vazirmatn = Vazirmatn({
-  subsets: ["arabic"],
-  variable: "--font-vazirmatn",
+const iranSans = localFont({
+  src: "../fonts/IRANSansXV.woff2",
+  variable: "--font-iran-sans",
   display: "swap",
+  weight: "100 900",
 });
 
 export const metadata: Metadata = {
@@ -39,7 +40,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fa" dir="rtl">
-      <body className={`${vazirmatn.variable} antialiased`}>
+      <body className={`${iranSans.variable} antialiased`}>
         <VoroodProvider>{children}</VoroodProvider>
       </body>
     </html>

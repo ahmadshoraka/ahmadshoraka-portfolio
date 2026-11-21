@@ -17,7 +17,7 @@
   --radius-sm: 14px;
   --touch: 44px;
   --shadow-soft: 0 10px 30px rgba(13, 58, 41, 0.06);
-  --font-body: var(--font-vazirmatn), "Tahoma", sans-serif;
+  --font-body: var(--font-iran-sans), "Tahoma", sans-serif;
   --bg-glow:
     radial-gradient(980px 520px at 85% -8%, rgba(167, 214, 186, 0.55) 0%, transparent 58%),
     radial-gradient(760px 420px at -5% 105%, rgba(232, 220, 150, 0.35) 0%, transparent 52%),
