@@ -1,0 +1,297 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { AppShell } from "@/components/app-shell";
+import { NumberInput, numberOr, type NumberValue } from "@/components/number-input";
+import { useVorood } from "@/components/vorood-provider";
+import { formatNumberFa } from "@/lib/calories";
+import { FOOD_CATALOG, searchFoods } from "@/lib/foods/seed-ir";
+
+type Tab = "catalog" | "manual" | "ai";
+
+type AiSuggestion = {
+  id: string;
+  name: string;
+  calories: number;
+  proteinG: number;
+  carbG: number;
+  fatG: number;
+  servingLabel: string;
+  reason: string;
+};
+
+export default function LogPage() {
+  const router = useRouter();
+  const { ready, profile, remainingCalories, addEntry } = useVorood();
+  const [tab, setTab] = useState<Tab>("catalog");
+  const [query, setQuery] = useState("");
+  const [manualName, setManualName] = useState("");
+  const [manualCal, setManualCal] = useState<NumberValue>(200);
+  const [manualP, setManualP] = useState<NumberValue>("");
+  const [manualC, setManualC] = useState<NumberValue>("");
+  const [manualF, setManualF] = useState<NumberValue>("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiSummary, setAiSummary] = useState("");
+  const [aiItems, setAiItems] = useState<AiSuggestion[]>([]);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (ready && !profile) router.replace("/onboarding");
+  }, [ready, profile, router]);
+
+  const foods = useMemo(() => searchFoods(query), [query]);
+
+  async function loadAiSuggestions() {
+    if (!profile) return;
+    setAiLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/ai/suggest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          remainingCalories: Math.max(0, remainingCalories),
+          level: profile.level,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "failed");
+      setAiSummary(data.summary ?? "");
+      setAiItems(data.suggestions ?? []);
+    } catch {
+      setError("پیشنهاد AI الان در دسترس نیست. از کاتالوگ یا ثبت دستی استفاده کن.");
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (tab === "ai" && profile && aiItems.length === 0 && !aiLoading) {
+      void loadAiSuggestions();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, profile]);
+
+  if (!ready || !profile) {
+    return <div className="loading-screen">در حال آماده‌سازی ثبت غذا…</div>;
+  }
+
+  const overBudget = remainingCalories < 0;
+
+  return (
+    <AppShell title="ثبت غذا">
+      <section className="panel">
+        <p className={overBudget ? "budget-note warn" : "muted"} style={{ marginTop: 0 }}>
+          {overBudget
+            ? `${formatNumberFa(Math.abs(remainingCalories))} کالری بیش از هدف`
+            : `مانده امروز: ${formatNumberFa(remainingCalories)} کالری`}
+        </p>
+        <div className="tabs" role="tablist">
+          {(
+            [
+              ["catalog", "کاتالوگ"],
+              ["manual", "دستی"],
+              ["ai", "پیشنهاد AI"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              className={tab === id ? "tab active" : "tab"}
+              onClick={() => setTab(id)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {tab === "catalog" ? (
+          <div className="stack-gap">
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label htmlFor="q">جستجو در غذاهای آماده</label>
+              <input
+                id="q"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="مثلاً قیمه، نان، تخم‌مرغ"
+              />
+            </div>
+            <div className="list">
+              {(query ? foods : FOOD_CATALOG).length === 0 ? (
+                <div className="empty-state">
+                  <div className="empty-orb" aria-hidden />
+                  <h3>چیزی پیدا نشد</h3>
+                  <p className="muted">عبارت دیگری امتحان کن یا از ثبت دستی استفاده کن.</p>
+                </div>
+              ) : (
+                (query ? foods : FOOD_CATALOG).map((f) => (
+                  <div key={f.id} className="list-item">
+                    <div>
+                      <div className="item-title">{f.nameFa}</div>
+                      <div className="muted">
+                        {formatNumberFa(f.calories)} کالری · {f.servingLabel}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => {
+                        addEntry({
+                          name: f.nameFa,
+                          calories: f.calories,
+                          proteinG: f.proteinG,
+                          carbG: f.carbG,
+                          fatG: f.fatG,
+                          source: "catalog",
+                        });
+                        router.push("/today");
+                      }}
+                    >
+                      افزودن
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        ) : null}
+
+        {tab === "manual" ? (
+          <form
+            className="stack-gap"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!manualName.trim()) return;
+              addEntry({
+                name: manualName.trim(),
+                calories: numberOr(manualCal, 0),
+                proteinG: numberOr(manualP, 0),
+                carbG: numberOr(manualC, 0),
+                fatG: numberOr(manualF, 0),
+                source: "manual",
+              });
+              router.push("/today");
+            }}
+          >
+            <div className="field">
+              <label htmlFor="mname">نام غذا</label>
+              <input
+                id="mname"
+                value={manualName}
+                onChange={(e) => setManualName(e.target.value)}
+                placeholder="غذای خانگی یا بیرون"
+                required
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="mcal">کالری</label>
+              <NumberInput
+                id="mcal"
+                min={0}
+                value={manualCal}
+                onChange={setManualCal}
+                inputMode="numeric"
+                required
+              />
+            </div>
+            {profile.level !== "beginner" ? (
+              <>
+                <div className="field">
+                  <label htmlFor="mp">پروتئین (g)</label>
+                  <NumberInput
+                    id="mp"
+                    min={0}
+                    value={manualP}
+                    onChange={setManualP}
+                    inputMode="numeric"
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="mc">کربوهیدرات (g)</label>
+                  <NumberInput
+                    id="mc"
+                    min={0}
+                    value={manualC}
+                    onChange={setManualC}
+                    inputMode="numeric"
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="mf">چربی (g)</label>
+                  <NumberInput
+                    id="mf"
+                    min={0}
+                    value={manualF}
+                    onChange={setManualF}
+                    inputMode="numeric"
+                  />
+                </div>
+              </>
+            ) : null}
+            <button type="submit" className="btn btn-primary btn-block">
+              ثبت دستی
+            </button>
+          </form>
+        ) : null}
+
+        {tab === "ai" ? (
+          <div className="stack-gap">
+            <p className="muted" style={{ margin: 0 }}>
+              پیشنهاد بر اساس کالری مانده و سطح تو.
+            </p>
+            <button
+              type="button"
+              className="btn btn-ghost btn-block"
+              onClick={() => void loadAiSuggestions()}
+              disabled={aiLoading}
+            >
+              {aiLoading ? "در حال پیشنهاد…" : "تازه‌سازی پیشنهادها"}
+            </button>
+            {error ? <p className="budget-note warn">{error}</p> : null}
+            {aiSummary ? <p className="muted">{aiSummary}</p> : null}
+            <div className="list">
+              {aiItems.length === 0 && !aiLoading ? (
+                <div className="empty-state">
+                  <div className="empty-orb" aria-hidden />
+                  <h3>پیشنهادی آماده نیست</h3>
+                  <p className="muted">تازه‌سازی را بزن یا از کاتالوگ انتخاب کن.</p>
+                </div>
+              ) : (
+                aiItems.map((s) => (
+                  <div key={s.id} className="list-item">
+                    <div>
+                      <div className="item-title">{s.name}</div>
+                      <div className="muted">
+                        {formatNumberFa(s.calories)} کالری · {s.servingLabel}
+                      </div>
+                      <div className="muted">{s.reason}</div>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => {
+                        addEntry({
+                          name: s.name,
+                          calories: s.calories,
+                          proteinG: s.proteinG,
+                          carbG: s.carbG,
+                          fatG: s.fatG,
+                          source: "ai",
+                        });
+                        router.push("/today");
+                      }}
+                    >
+                      افزودن
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        ) : null}
+      </section>
+    </AppShell>
+  );
+}

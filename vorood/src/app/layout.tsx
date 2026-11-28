@@ -1,0 +1,48 @@
+import type { Metadata, Viewport } from "next";
+import localFont from "next/font/local";
+import { VoroodProvider } from "@/components/vorood-provider";
+import "./globals.css";
+
+const iranSans = localFont({
+  src: "../fonts/IRANSansXV.woff2",
+  variable: "--font-iran-sans",
+  display: "swap",
+  weight: "100 900",
+});
+
+export const metadata: Metadata = {
+  title: "ورود | کالری‌شمار تغذیه",
+  description:
+    "ورود؛ تمرکز روی ورودی کالری به بدن. هدف روزانه، ثبت غذا، و دستیار تغذیه.",
+  applicationName: "ورود",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "ورود",
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#1f6a4c",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="fa" dir="rtl">
+      <body className={`${iranSans.variable} ${iranSans.className} antialiased`}>
+        <VoroodProvider>{children}</VoroodProvider>
+      </body>
+    </html>
+  );
+}

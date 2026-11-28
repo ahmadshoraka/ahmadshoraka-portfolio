@@ -1,0 +1,91 @@
+{
+  "name": "ورود — Project Board",
+  "updatedAt": "2026-11-28T16:30:00+03:30",
+  "columns": ["backlog", "doing", "done"],
+  "tasks": [
+    {
+      "id": "ui-sprint-1",
+      "title": "اسپرینت UI: نواقص ظاهری + user-friendly + polish",
+      "status": "done",
+      "priority": "P0",
+      "area": "ui"
+    },
+    {
+      "id": "font-iran-sans",
+      "title": "تزریق فونت IRANSansXV",
+      "status": "done",
+      "priority": "P0",
+      "area": "ui"
+    },
+    {
+      "id": "ui-feedback-pass",
+      "title": "چکش‌کاری UI بر اساس بازخورد صفحه به صفحه",
+      "status": "doing",
+      "priority": "P0",
+      "area": "ui"
+    },
+    {
+      "id": "food-db-expand",
+      "title": "گسترش بانک غذای ایرانی + جستجوی بهتر",
+      "status": "backlog",
+      "priority": "P1",
+      "area": "product"
+    },
+    {
+      "id": "food-ux",
+      "title": "ثبت غذا راحت‌تر: ویرایش وعده + کپی از دیروز",
+      "status": "backlog",
+      "priority": "P1",
+      "area": "product"
+    },
+    {
+      "id": "deploy-public",
+      "title": "دیپلوی عمومی ورود با لینک ثابت",
+      "status": "backlog",
+      "priority": "P1",
+      "area": "infra"
+    },
+    {
+      "id": "ai-real",
+      "title": "وصل کردن LLM واقعی به /api/ai/*",
+      "status": "backlog",
+      "priority": "P1",
+      "area": "ai"
+    },
+    {
+      "id": "persistence",
+      "title": "جایگزینی localStorage با ذخیره پایدار + حساب کاربری",
+      "status": "backlog",
+      "priority": "P2",
+      "area": "infra"
+    },
+    {
+      "id": "week-report",
+      "title": "گزارش ۷ روزه کالری و وزن",
+      "status": "backlog",
+      "priority": "P2",
+      "area": "product"
+    },
+    {
+      "id": "pwa-install",
+      "title": "بهبود نصب PWA روی موبایل",
+      "status": "backlog",
+      "priority": "P2",
+      "area": "product"
+    },
+    {
+      "id": "arabic-iraq",
+      "title": "زبان عربی و غذاهای عراقی",
+      "status": "backlog",
+      "priority": "P3",
+      "area": "growth"
+    },
+    {
+      "id": "monetization",
+      "title": "مسیر پرداخت / freemium",
+      "status": "backlog",
+      "priority": "P3",
+      "area": "growth"
+    }
+  ]
+}
