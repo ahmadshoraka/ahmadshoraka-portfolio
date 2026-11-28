@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { computeDailyTargets, formatNumberFa } from "@/lib/calories";
+import { NumberInput, numberOr, type NumberValue } from "@/components/number-input";
 import { useVorood } from "@/components/vorood-provider";
 import type { ActivityLevel, Sex, UserLevel } from "@/lib/types";
 
@@ -27,36 +28,40 @@ export default function OnboardingPage() {
 
   const [name, setName] = useState("");
   const [sex, setSex] = useState<Sex>("female");
-  const [age, setAge] = useState(28);
-  const [heightCm, setHeightCm] = useState(165);
-  const [weightKg, setWeightKg] = useState(70);
-  const [targetWeightKg, setTargetWeightKg] = useState(65);
+  const [age, setAge] = useState<NumberValue>(28);
+  const [heightCm, setHeightCm] = useState<NumberValue>(165);
+  const [weightKg, setWeightKg] = useState<NumberValue>(70);
+  const [targetWeightKg, setTargetWeightKg] = useState<NumberValue>(65);
   const [activity, setActivity] = useState<ActivityLevel>("light");
   const [level, setLevel] = useState<UserLevel>("beginner");
+
+  const resolved = useMemo(
+    () => ({
+      age: numberOr(age, 28),
+      heightCm: numberOr(heightCm, 165),
+      weightKg: numberOr(weightKg, 70),
+      targetWeightKg: numberOr(targetWeightKg, 65),
+    }),
+    [age, heightCm, weightKg, targetWeightKg],
+  );
 
   const preview = useMemo(
     () =>
       computeDailyTargets({
         sex,
-        age,
-        heightCm,
-        weightKg,
-        targetWeightKg,
         activity,
+        ...resolved,
       }),
-    [sex, age, heightCm, weightKg, targetWeightKg, activity],
+    [sex, activity, resolved],
   );
 
   function finish() {
     completeOnboarding({
       name: name.trim() || "کاربر",
       sex,
-      age,
-      heightCm,
-      weightKg,
-      targetWeightKg,
       activity,
       level,
+      ...resolved,
     });
     router.push("/today");
   }
@@ -118,24 +123,24 @@ export default function OnboardingPage() {
           <div className="row-2">
             <div className="field">
               <label htmlFor="age">سن</label>
-              <input
+              <NumberInput
                 id="age"
-                type="number"
                 min={14}
                 max={90}
                 value={age}
-                onChange={(e) => setAge(Number(e.target.value))}
+                onChange={setAge}
+                inputMode="numeric"
               />
             </div>
             <div className="field">
               <label htmlFor="height">قد (سانتی‌متر)</label>
-              <input
+              <NumberInput
                 id="height"
-                type="number"
                 min={120}
                 max={230}
                 value={heightCm}
-                onChange={(e) => setHeightCm(Number(e.target.value))}
+                onChange={setHeightCm}
+                inputMode="numeric"
               />
             </div>
           </div>
@@ -154,26 +159,26 @@ export default function OnboardingPage() {
           <div className="row-2">
             <div className="field">
               <label htmlFor="weight">وزن فعلی</label>
-              <input
+              <NumberInput
                 id="weight"
-                type="number"
                 min={35}
                 max={250}
                 step={0.1}
                 value={weightKg}
-                onChange={(e) => setWeightKg(Number(e.target.value))}
+                onChange={setWeightKg}
+                inputMode="decimal"
               />
             </div>
             <div className="field">
               <label htmlFor="target">وزن هدف</label>
-              <input
+              <NumberInput
                 id="target"
-                type="number"
                 min={35}
                 max={250}
                 step={0.1}
                 value={targetWeightKg}
-                onChange={(e) => setTargetWeightKg(Number(e.target.value))}
+                onChange={setTargetWeightKg}
+                inputMode="decimal"
               />
             </div>
           </div>

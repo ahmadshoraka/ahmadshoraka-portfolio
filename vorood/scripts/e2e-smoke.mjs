@@ -24,12 +24,33 @@ await page.evaluate(() => localStorage.clear());
 await page.reload({ waitUntil: "networkidle" });
 await page.getByRole("link", { name: "شروع کن" }).click();
 await page.waitForURL("**/onboarding");
+
+// #18: clearing numeric input should stay empty, not sticky 0
+const age = page.locator("#age");
+await age.fill("28");
+await age.fill("");
+const ageAfterClear = await age.inputValue();
+if (ageAfterClear !== "") {
+  console.error("FAIL: age input sticky zero/value after clear:", ageAfterClear);
+  process.exit(1);
+}
+await age.fill("28");
+
 await page.getByRole("textbox", { name: "نام" }).fill("آزما");
 await page.getByRole("button", { name: "ادامه" }).click();
 await page.getByRole("button", { name: "ادامه" }).click();
 await page.getByRole("button", { name: "برو به امروز" }).click();
 await page.waitForURL("**/today");
-await page.screenshot({ path: path.join(outDir, "vorood-e2e-today.png"), fullPage: true });
+await page.screenshot({
+  path: path.join(outDir, "vorood-header-today.png"),
+  fullPage: true,
+});
+
+const headerBox = await page.locator("header.topbar").boundingBox();
+if (!headerBox || headerBox.width < 380) {
+  console.error("FAIL: header not near full mobile width", headerBox);
+  process.exit(1);
+}
 
 await nav().getByRole("link", { name: "ثبت غذا" }).click();
 await page.waitForURL("**/log");
@@ -37,7 +58,10 @@ const eggRow = page.locator(".list-item").filter({ hasText: "تخم‌مرغ" })
 await eggRow.getByRole("button", { name: "افزودن" }).click();
 await page.waitForURL("**/today");
 const eatenText = await page.locator(".stat").nth(1).innerText();
-await page.screenshot({ path: path.join(outDir, "vorood-e2e-after-add.png"), fullPage: true });
+await page.screenshot({
+  path: path.join(outDir, "vorood-e2e-after-add.png"),
+  fullPage: true,
+});
 
 await nav().getByRole("link", { name: "ثبت غذا" }).click();
 await page.waitForURL("**/log");
@@ -59,6 +83,8 @@ await page.screenshot({ path: path.join(outDir, "vorood-e2e-chat.png"), fullPage
 const bubbles = await page.locator(".bubble.assistant").count();
 
 const result = {
+  ageAfterClear,
+  headerWidth: headerBox.width,
   eatenText,
   aiOk,
   assistantBubbles: bubbles,

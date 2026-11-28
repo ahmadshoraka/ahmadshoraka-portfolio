@@ -62,10 +62,10 @@ export function AppShell({
   return (
     <div className="app-frame">
       <header className="topbar">
-        <Link href="/today" className="brand-mark">
+        <Link href="/today" className="brand-mark" aria-label="ورود — صفحه امروز">
           ورود
         </Link>
-        {title ? <p className="topbar-title">{title}</p> : null}
+        {title ? <p className="topbar-title">{title}</p> : <span />}
       </header>
       <main className="page-main">{children}</main>
       <nav className="bottom-nav" aria-label="ناوبری اصلی">

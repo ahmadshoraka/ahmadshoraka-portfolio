@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { NumberInput, numberOr, type NumberValue } from "@/components/number-input";
 import { useVorood } from "@/components/vorood-provider";
 import { formatNumberFa } from "@/lib/calories";
 import { FOOD_CATALOG, searchFoods } from "@/lib/foods/seed-ir";
@@ -26,10 +27,10 @@ export default function LogPage() {
   const [tab, setTab] = useState<Tab>("catalog");
   const [query, setQuery] = useState("");
   const [manualName, setManualName] = useState("");
-  const [manualCal, setManualCal] = useState(200);
-  const [manualP, setManualP] = useState(0);
-  const [manualC, setManualC] = useState(0);
-  const [manualF, setManualF] = useState(0);
+  const [manualCal, setManualCal] = useState<NumberValue>(200);
+  const [manualP, setManualP] = useState<NumberValue>("");
+  const [manualC, setManualC] = useState<NumberValue>("");
+  const [manualF, setManualF] = useState<NumberValue>("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiSummary, setAiSummary] = useState("");
   const [aiItems, setAiItems] = useState<AiSuggestion[]>([]);
@@ -165,10 +166,10 @@ export default function LogPage() {
               if (!manualName.trim()) return;
               addEntry({
                 name: manualName.trim(),
-                calories: Number(manualCal) || 0,
-                proteinG: Number(manualP) || 0,
-                carbG: Number(manualC) || 0,
-                fatG: Number(manualF) || 0,
+                calories: numberOr(manualCal, 0),
+                proteinG: numberOr(manualP, 0),
+                carbG: numberOr(manualC, 0),
+                fatG: numberOr(manualF, 0),
                 source: "manual",
               });
               router.push("/today");
@@ -186,12 +187,12 @@ export default function LogPage() {
             </div>
             <div className="field">
               <label htmlFor="mcal">کالری</label>
-              <input
+              <NumberInput
                 id="mcal"
-                type="number"
                 min={0}
                 value={manualCal}
-                onChange={(e) => setManualCal(Number(e.target.value))}
+                onChange={setManualCal}
+                inputMode="numeric"
                 required
               />
             </div>
@@ -199,32 +200,32 @@ export default function LogPage() {
               <>
                 <div className="field">
                   <label htmlFor="mp">پروتئین (g)</label>
-                  <input
+                  <NumberInput
                     id="mp"
-                    type="number"
                     min={0}
                     value={manualP}
-                    onChange={(e) => setManualP(Number(e.target.value))}
+                    onChange={setManualP}
+                    inputMode="numeric"
                   />
                 </div>
                 <div className="field">
                   <label htmlFor="mc">کربوهیدرات (g)</label>
-                  <input
+                  <NumberInput
                     id="mc"
-                    type="number"
                     min={0}
                     value={manualC}
-                    onChange={(e) => setManualC(Number(e.target.value))}
+                    onChange={setManualC}
+                    inputMode="numeric"
                   />
                 </div>
                 <div className="field">
                   <label htmlFor="mf">چربی (g)</label>
-                  <input
+                  <NumberInput
                     id="mf"
-                    type="number"
                     min={0}
                     value={manualF}
-                    onChange={(e) => setManualF(Number(e.target.value))}
+                    onChange={setManualF}
+                    inputMode="numeric"
                   />
                 </div>
               </>

@@ -40,7 +40,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fa" dir="rtl">
-      <body className={`${iranSans.variable} antialiased`}>
+      <body className={`${iranSans.variable} ${iranSans.className} antialiased`}>
         <VoroodProvider>{children}</VoroodProvider>
       </body>
     </html>
